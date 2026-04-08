@@ -25,11 +25,60 @@ Use this scheduler when you want:
 
 - `include/scheduler/scheduler.h`: public scheduler API and task model.
 - `include/scheduler/isr_buffer.h`: ISR-producer/task-consumer ring and event queue utilities.
+- `include/scheduler/services/uart_service.h`: UART ISR-to-service skeleton.
+- `include/scheduler/services/ethernet_service.h`: Ethernet ISR-to-service skeleton.
+- `include/scheduler/services/i2c_eeprom_service.h`: I2C/EEPROM request/completion skeleton.
+- `include/scheduler/services/motor_supervision_service.h`: motor feedback/fault supervision skeleton.
+- `include/scheduler/services/fsi_service.h`: FSI ISR-to-service skeleton.
+- `include/scheduler/services/ipc_service.h`: IPC ISR-to-service skeleton.
 - `include/scheduler/port/scheduler_port.h`: platform/porting hooks.
 - `src/scheduler.c`: scheduler implementation.
 - `src/isr_buffer.c`: buffering utility implementation.
+- `src/services/*.c`: service skeleton implementations for UART/Ethernet/I2C/Motor/FSI/IPC.
 - `examples/main_example.c`: minimal integration example.
 - `tests/unit/test_scheduler.c`: unit tests (Unity/Ceedling).
+
+## Service skeleton modules (`include/scheduler/services/`)
+
+All service modules in this folder use the same core contract:
+- ISR path is bounded and minimal (ack + capture + queue + hint).
+- Service path performs bounded draining/processing per scheduler run.
+- Queue/ring carries multiplicity/payload while hint/event bits are advisory wakeups.
+
+Available skeletons:
+- `uart_service`: byte-oriented RX/TX handoff using SPSC rings.
+- `ethernet_service`: RX/TX/link events via event queue descriptors.
+- `i2c_eeprom_service`: deferred request submission + completion event handling.
+- `motor_supervision_service`: feedback sampling + fault event supervision.
+- `fsi_service`: FSI RX/TX/error interrupt handoff with compact ISR records.
+- `ipc_service`: IPC notify/ack/fault interrupt handoff with compact ISR records.
+
+## FSI/IPC interrupt service skeleton wiring
+
+Both FSI and IPC skeletons follow the same ISR-to-task handoff model:
+- ISR acknowledges source, records minimal metadata, sets advisory event bits.
+- Service task drains a bounded number of queued records per scheduler run.
+
+```c
+#include "scheduler/services/fsi_service.h"
+#include "scheduler/services/ipc_service.h"
+
+static sch_fsi_service_t g_fsi_service;
+static sch_ipc_service_t g_ipc_service;
+
+/* Register as background/event service tasks. */
+(void)sch_add_task(&scheduler, sch_fsi_service_run, &g_fsi_service, 0u, 0u, 6u);
+(void)sch_add_task(&scheduler, sch_ipc_service_run, &g_ipc_service, 0u, 0u, 7u);
+
+/* Platform IRQ stubs route to minimal handoff ISRs. */
+void FSI_RX_IRQHandler(void) {
+    sch_fsi_isr_rx(&g_fsi_service, 0u, 0u, 0u);
+}
+
+void IPC_NOTIFY_IRQHandler(void) {
+    sch_ipc_isr_notify(&g_ipc_service, 0u, 0u, 0u);
+}
+```
 
 ## Core integration steps for an embedded project
 
