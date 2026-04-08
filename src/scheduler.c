@@ -1,0 +1,279 @@
+/**
+ * @file scheduler.c
+ * @brief Cooperative scheduler implementation.
+ *
+ * This translation unit implements the scheduler API declared in
+ * @ref scheduler/scheduler.h and uses the target hooks provided by
+ * @ref scheduler/port/scheduler_port.h.
+ */
+
+#include "scheduler/scheduler.h"
+
+#include "scheduler/port/scheduler_port.h"
+
+#define SCH_LOWEST_PRIORITY (255u)
+
+/**
+ * @brief Check whether a target tick has been reached.
+ *
+ * The comparison is wrap-around safe for the usual half-range interval
+ * used by embedded tick counters.
+ *
+ * @param now Current tick value.
+ * @param target Tick value to compare against.
+ *
+ * @retval true The target tick has been reached.
+ * @retval false The target tick has not been reached.
+ */
+static bool sch_time_reached(uint32_t now, uint32_t target) {
+    return ((int32_t)(now - target) >= 0);
+}
+
+/**
+ * @brief Advance a periodic task release time in bounded time.
+ *
+ * This helper computes the first release strictly greater than @p now,
+ * avoiding an unbounded catch-up loop while the scheduler is in a critical
+ * section.
+ *
+ * @param now Current tick value.
+ * @param next_release Previously scheduled release tick.
+ * @param period Task period in ticks.
+ *
+ * @return The next release tick strictly after @p now for valid periodic
+ *         tasks, or @p next_release when @p period is zero.
+ */
+static uint32_t sch_advance_next_release(uint32_t now, uint32_t next_release, uint32_t period) {
+    if (period == 0u) {
+        return next_release;
+    }
+
+    int32_t lateness = (int32_t)(now - next_release);
+    if (lateness < 0) {
+        return next_release;
+    }
+
+    uint32_t releases_to_skip = ((uint32_t)lateness / period) + 1u;
+    return next_release + (releases_to_skip * period);
+}
+
+/**
+ * @brief Initialize scheduler state.
+ *
+ * @param scheduler Scheduler instance to initialize.
+ */
+void sch_init(sch_t *scheduler) {
+    if (scheduler == NULL) {
+        return;
+    }
+
+    uint32_t state = sch_port_enter_critical();
+    for (uint32_t i = 0u; i < SCH_MAX_TASKS; ++i) {
+        scheduler->tasks[i].fn = NULL;
+        scheduler->tasks[i].ctx = NULL;
+        scheduler->tasks[i].period_ticks = 0u;
+        scheduler->tasks[i].next_release = 0u;
+        scheduler->tasks[i].priority = SCH_LOWEST_PRIORITY;
+        scheduler->tasks[i].enabled = false;
+        scheduler->tasks[i].pending = false;
+        scheduler->tasks[i].in_use = false;
+    }
+    scheduler->task_count = 0u;
+    scheduler->next_background_idx = 0u;
+    sch_port_exit_critical(state);
+}
+
+/**
+ * @brief Add a task to the scheduler.
+ *
+ * @param scheduler Scheduler instance.
+ * @param fn Task callback.
+ * @param ctx Opaque task context pointer.
+ * @param period_ticks Period in ticks (0 for background tasks).
+ * @param start_delay_ticks Delay before first release.
+ * @param priority Lower numeric value means higher priority.
+ *
+ * @return Task slot index on success or a negative error code.
+ */
+int32_t sch_add_task(
+    sch_t *scheduler,
+    sch_task_fn_t fn,
+    void *ctx,
+    uint32_t period_ticks,
+    uint32_t start_delay_ticks,
+    uint8_t priority) {
+    if ((scheduler == NULL) || (fn == NULL)) {
+        return SCH_ERR_INVALID_ARG;
+    }
+
+    uint32_t state = sch_port_enter_critical();
+    if (scheduler->task_count >= SCH_MAX_TASKS) {
+        sch_port_exit_critical(state);
+        return SCH_ERR_NO_SPACE;
+    }
+
+    uint32_t now = sch_port_now_ticks();
+    for (uint32_t i = 0u; i < SCH_MAX_TASKS; ++i) {
+        if (!scheduler->tasks[i].in_use) {
+            scheduler->tasks[i].fn = fn;
+            scheduler->tasks[i].ctx = ctx;
+            scheduler->tasks[i].period_ticks = period_ticks;
+            scheduler->tasks[i].next_release = now + start_delay_ticks;
+            scheduler->tasks[i].priority = priority;
+            scheduler->tasks[i].enabled = true;
+            scheduler->tasks[i].pending = false;
+            scheduler->tasks[i].in_use = true;
+            scheduler->task_count++;
+            sch_port_exit_critical(state);
+            return (int32_t)i;
+        }
+    }
+
+    sch_port_exit_critical(state);
+    return SCH_ERR_NO_SPACE;
+}
+
+/**
+ * @brief Enable or disable a task.
+ *
+ * @param scheduler Scheduler instance.
+ * @param task_id Task identifier.
+ * @param enable true to enable, false to disable.
+ */
+void sch_enable_task(sch_t *scheduler, uint32_t task_id, bool enable) {
+    if ((scheduler == NULL) || (task_id >= SCH_MAX_TASKS)) {
+        return;
+    }
+
+    uint32_t state = sch_port_enter_critical();
+    if (scheduler->tasks[task_id].in_use) {
+        scheduler->tasks[task_id].enabled = enable;
+        if (!enable) {
+            scheduler->tasks[task_id].pending = false;
+        }
+    }
+    sch_port_exit_critical(state);
+}
+
+/**
+ * @brief Mark periodic tasks as pending when release time is reached.
+ *
+ * @param scheduler Scheduler instance.
+ * @param now Current tick value.
+ */
+static void sch_mark_periodic_ready(sch_t *scheduler, uint32_t now) {
+    for (uint32_t i = 0u; i < SCH_MAX_TASKS; ++i) {
+        sch_task_t *task = &scheduler->tasks[i];
+        if (!task->in_use || !task->enabled || (task->period_ticks == 0u)) {
+            continue;
+        }
+
+        if (sch_time_reached(now, task->next_release)) {
+            task->pending = true;
+        }
+    }
+}
+
+/**
+ * @brief Select the highest-priority pending periodic task.
+ *
+ * @param scheduler Scheduler instance.
+ *
+ * @return Task identifier, or @ref SCH_INVALID_TASK_ID if none are pending.
+ */
+static int32_t sch_select_pending_task(const sch_t *scheduler) {
+    int32_t selected = SCH_INVALID_TASK_ID;
+    uint8_t best_priority = SCH_LOWEST_PRIORITY;
+
+    for (uint32_t i = 0u; i < SCH_MAX_TASKS; ++i) {
+        const sch_task_t *task = &scheduler->tasks[i];
+        if (!task->in_use || !task->enabled || !task->pending || (task->period_ticks == 0u)) {
+            continue;
+        }
+
+        if ((selected == SCH_INVALID_TASK_ID) || (task->priority < best_priority) ||
+            ((task->priority == best_priority) && (i < (uint32_t)selected))) {
+            selected = (int32_t)i;
+            best_priority = task->priority;
+        }
+    }
+
+    return selected;
+}
+
+/**
+ * @brief Select the next enabled background task in round-robin order.
+ *
+ * @param scheduler Scheduler instance.
+ *
+ * @return Task identifier, or @ref SCH_INVALID_TASK_ID if none are available.
+ */
+static int32_t sch_select_background_task(sch_t *scheduler) {
+    uint32_t start = scheduler->next_background_idx;
+
+    for (uint32_t offset = 0u; offset < SCH_MAX_TASKS; ++offset) {
+        uint32_t idx = (start + offset) % SCH_MAX_TASKS;
+        sch_task_t *task = &scheduler->tasks[idx];
+        if (task->in_use && task->enabled && (task->period_ticks == 0u)) {
+            scheduler->next_background_idx = (idx + 1u) % SCH_MAX_TASKS;
+            return (int32_t)idx;
+        }
+    }
+
+    return SCH_INVALID_TASK_ID;
+}
+
+/**
+ * @brief Execute one scheduler cycle.
+ *
+ * The function runs all currently ready periodic tasks in priority order, then
+ * executes at most one background task or calls the platform idle hook.
+ *
+ * @param scheduler Scheduler instance.
+ */
+void sch_run(sch_t *scheduler) {
+    if (scheduler == NULL) {
+        return;
+    }
+
+    for (;;) {
+        uint32_t state = sch_port_enter_critical();
+        uint32_t now = sch_port_now_ticks();
+        sch_mark_periodic_ready(scheduler, now);
+        int32_t selected = sch_select_pending_task(scheduler);
+
+        if (selected == SCH_INVALID_TASK_ID) {
+            sch_port_exit_critical(state);
+            break;
+        }
+
+        sch_task_t *task = &scheduler->tasks[selected];
+        task->pending = false;
+        sch_task_fn_t fn = task->fn;
+        void *ctx = task->ctx;
+        uint32_t period = task->period_ticks;
+        uint32_t next_release = task->next_release;
+
+        task->next_release = sch_advance_next_release(now, next_release, period);
+
+        sch_port_exit_critical(state);
+        fn(ctx);
+    }
+
+    uint32_t state = sch_port_enter_critical();
+    int32_t background_id = sch_select_background_task(scheduler);
+    sch_task_fn_t background_fn = NULL;
+    void *background_ctx = NULL;
+
+    if (background_id != SCH_INVALID_TASK_ID) {
+        background_fn = scheduler->tasks[background_id].fn;
+        background_ctx = scheduler->tasks[background_id].ctx;
+    }
+    sch_port_exit_critical(state);
+
+    if (background_fn != NULL) {
+        background_fn(background_ctx);
+    } else {
+        sch_port_idle();
+    }
+}

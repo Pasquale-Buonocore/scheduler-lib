@@ -1,0 +1,40 @@
+:project:
+  :which_ceedling: gem
+  :use_exceptions: FALSE
+  :use_test_preprocessor: :all
+  :build_root: build/ceedling
+  :test_file_prefix: test_
+  :default_tasks:
+    - test:all
+
+:plugins:
+  :enabled:
+    - gcov
+
+:paths:
+  :test:
+    - +:tests/unit
+  :source:
+    - src
+  :include:
+    - include
+    - include/scheduler
+    - include/scheduler/port
+
+:defines:
+  :test:
+    - TEST
+
+:cmock:
+  :mock_prefix: mock_
+  :when_no_prototypes: :warn
+  :enforce_strict_ordering: TRUE
+
+:unity:
+  :verbosity: 2
+
+:gcov:
+  :reports:
+    - HtmlBasic
+    - Text
+  :html_report_type: basic
