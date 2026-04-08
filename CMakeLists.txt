@@ -7,6 +7,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 add_library(scheduler STATIC
     src/scheduler.c
+    src/isr_buffer.c
 )
 
 target_include_directories(scheduler
