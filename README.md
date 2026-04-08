@@ -24,8 +24,10 @@ Use this scheduler when you want:
 ## Project structure
 
 - `include/scheduler/scheduler.h`: public scheduler API and task model.
+- `include/scheduler/isr_buffer.h`: ISR-producer/task-consumer ring and event queue utilities.
 - `include/scheduler/port/scheduler_port.h`: platform/porting hooks.
 - `src/scheduler.c`: scheduler implementation.
+- `src/isr_buffer.c`: buffering utility implementation.
 - `examples/main_example.c`: minimal integration example.
 - `tests/unit/test_scheduler.c`: unit tests (Unity/Ceedling).
 
