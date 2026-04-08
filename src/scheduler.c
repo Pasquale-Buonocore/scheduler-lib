@@ -141,18 +141,9 @@ int32_t sch_add_task(
  * @param enable true to enable, false to disable.
  */
 void sch_enable_task(sch_t *scheduler, uint32_t task_id, bool enable) {
-    if ((scheduler == NULL) || (task_id >= SCH_MAX_TASKS)) {
-        return;
-    }
-
-    uint32_t state = sch_port_enter_critical();
-    if (scheduler->tasks[task_id].in_use) {
-        scheduler->tasks[task_id].enabled = enable;
-        if (!enable) {
-            scheduler->tasks[task_id].pending = false;
-        }
-    }
-    sch_port_exit_critical(state);
+    (void)scheduler;
+    (void)task_id;
+    (void)enable;
 }
 
 /**
@@ -236,10 +227,19 @@ void sch_run(sch_t *scheduler) {
         return;
     }
 
-    for (;;) {
-        uint32_t state = sch_port_enter_critical();
-        uint32_t now = sch_port_now_ticks();
-        sch_mark_periodic_ready(scheduler, now);
+    uint32_t state = sch_port_enter_critical();
+    uint32_t now = sch_port_now_ticks();
+    sch_mark_periodic_ready(scheduler, now);
+    sch_port_exit_critical(state);
+
+    /*
+     * Process only the ready set collected at run entry. This bounds the
+     * periodic workload of one scheduler cycle to at most SCH_MAX_TASKS
+     * callbacks and prevents overload from turning one run into an unbounded
+     * catch-up loop.
+     */
+    for (uint32_t executed_periodic = 0u; executed_periodic < SCH_MAX_TASKS; ++executed_periodic) {
+        state = sch_port_enter_critical();
         int32_t selected = sch_select_pending_task(scheduler);
 
         if (selected == SCH_INVALID_TASK_ID) {
@@ -260,7 +260,7 @@ void sch_run(sch_t *scheduler) {
         fn(ctx);
     }
 
-    uint32_t state = sch_port_enter_critical();
+    uint32_t background_state = sch_port_enter_critical();
     int32_t background_id = sch_select_background_task(scheduler);
     sch_task_fn_t background_fn = NULL;
     void *background_ctx = NULL;
@@ -269,7 +269,7 @@ void sch_run(sch_t *scheduler) {
         background_fn = scheduler->tasks[background_id].fn;
         background_ctx = scheduler->tasks[background_id].ctx;
     }
-    sch_port_exit_critical(state);
+    sch_port_exit_critical(background_state);
 
     if (background_fn != NULL) {
         background_fn(background_ctx);

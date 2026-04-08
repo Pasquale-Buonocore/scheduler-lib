@@ -32,7 +32,6 @@ extern "C" {
  * @param ctx Opaque caller-provided context.
  */
 typedef void (*sch_task_fn_t)(void *ctx);
-
 /**
  * @brief Task control block used internally by the scheduler.
  */
@@ -84,11 +83,11 @@ int32_t sch_add_task(
     uint8_t priority);
 
 /**
- * @brief Enable or disable a task.
+ * @brief Compatibility API: task enable/disable runtime control is unsupported.
  *
  * @param scheduler Scheduler instance.
  * @param task_id Task identifier returned by @ref sch_add_task.
- * @param enable true to enable, false to disable.
+ * @param enable Unused.
  */
 void sch_enable_task(sch_t *scheduler, uint32_t task_id, bool enable);
 
