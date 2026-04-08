@@ -23,6 +23,12 @@ static uint8_t call_trace[16];
 static uint32_t call_trace_len;
 /** @brief Optional function used by a test task to mutate fake time. */
 static void (*task_a_hook)(void);
+#if (SCH_ENABLE_TRACE == 1)
+/** @brief Count of trace hook invocations. */
+static uint32_t trace_call_count;
+/** @brief Last trace event observed by test hook. */
+static sch_trace_event_t last_trace_event;
+#endif
 
 /** @brief Test hook that advances fake time by one period. */
 static void hook_advance_time_by_period(void) {
@@ -94,6 +100,10 @@ void setUp(void) {
     bg_calls = 0u;
     call_trace_len = 0u;
     task_a_hook = NULL;
+#if (SCH_ENABLE_TRACE == 1)
+    trace_call_count = 0u;
+    last_trace_event = SCH_TRACE_IDLE;
+#endif
 }
 
 /** @brief Unity teardown hook. */
@@ -220,3 +230,63 @@ void test_sch_run_should_bound_periodic_work_per_cycle(void) {
 
     task_a_hook = NULL;
 }
+
+#if (SCH_ENABLE_STATS == 1)
+/** @brief Verify stats capture execution count and timing snapshots. */
+void test_sch_stats_should_capture_task_execution_observability(void) {
+    sch_t scheduler;
+    sch_task_stats_t stats;
+    sch_init(&scheduler);
+
+    int32_t id = sch_add_task(&scheduler, task_a, NULL, 100u, 100u, 0u);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, id);
+
+    fake_time_us = 100u;
+    task_a_hook = hook_advance_time_by_period;
+    sch_run(&scheduler);
+    task_a_hook = NULL;
+
+    TEST_ASSERT_TRUE(sch_get_task_stats(&scheduler, (uint32_t)id, &stats));
+    TEST_ASSERT_EQUAL_UINT32(1u, stats.run_count);
+    TEST_ASSERT_EQUAL_UINT32(100u, stats.last_exec_ticks);
+    TEST_ASSERT_EQUAL_UINT32(100u, stats.max_exec_ticks);
+    TEST_ASSERT_EQUAL_UINT32(100u, stats.total_exec_ticks);
+
+    sch_reset_stats(&scheduler);
+    TEST_ASSERT_TRUE(sch_get_task_stats(&scheduler, (uint32_t)id, &stats));
+    TEST_ASSERT_EQUAL_UINT32(0u, stats.run_count);
+    TEST_ASSERT_EQUAL_UINT32(0u, stats.total_exec_ticks);
+}
+#endif
+
+#if (SCH_ENABLE_TRACE == 1)
+/** @brief Test trace hook increments invocation count. */
+static void trace_hook(sch_trace_event_t event, int32_t task_id, uint32_t timestamp, void *user_ctx) {
+    (void)task_id;
+    (void)timestamp;
+    uint32_t *count = (uint32_t *)user_ctx;
+    (*count)++;
+    last_trace_event = event;
+}
+
+/** @brief Verify trace callback fires for task execution and idle path. */
+void test_sch_trace_should_emit_task_and_idle_events(void) {
+    sch_t scheduler;
+    sch_init(&scheduler);
+
+    sch_set_trace_hook(&scheduler, trace_hook, &trace_call_count);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, sch_add_task(&scheduler, task_a, NULL, 100u, 100u, 0u));
+
+    fake_time_us = 100u;
+    sch_run(&scheduler);
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT32(2u, trace_call_count);
+
+    sch_set_trace_hook(&scheduler, trace_hook, &trace_call_count);
+    trace_call_count = 0u;
+    sch_init(&scheduler);
+    sch_set_trace_hook(&scheduler, trace_hook, &trace_call_count);
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(1u, trace_call_count);
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)SCH_TRACE_IDLE, (uint32_t)last_trace_event);
+}
+#endif
