@@ -31,3 +31,9 @@ add_executable(main_example
 )
 
 target_link_libraries(main_example PRIVATE scheduler)
+
+add_executable(main_events_example
+    examples/main_events_example.c
+)
+
+target_link_libraries(main_events_example PRIVATE scheduler)
