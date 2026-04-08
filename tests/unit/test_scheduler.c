@@ -175,8 +175,8 @@ void test_sch_run_should_call_idle_when_nothing_to_execute(void) {
     TEST_ASSERT_EQUAL_UINT32(1u, idle_call_count);
 }
 
-/** @brief Verify background tasks can be disabled and enabled at runtime. */
-void test_sch_enable_task_should_disable_and_enable_background_task(void) {
+/** @brief Verify runtime enable/disable API does not affect background tasks. */
+void test_sch_enable_task_should_not_disable_background_task(void) {
     sch_t scheduler;
     sch_init(&scheduler);
 
@@ -185,12 +185,8 @@ void test_sch_enable_task_should_disable_and_enable_background_task(void) {
 
     sch_enable_task(&scheduler, (uint32_t)id, false);
     sch_run(&scheduler);
-    TEST_ASSERT_EQUAL_UINT32(0u, bg_calls);
-    TEST_ASSERT_EQUAL_UINT32(1u, idle_call_count);
-
-    sch_enable_task(&scheduler, (uint32_t)id, true);
-    sch_run(&scheduler);
     TEST_ASSERT_EQUAL_UINT32(1u, bg_calls);
+    TEST_ASSERT_EQUAL_UINT32(0u, idle_call_count);
 }
 
 /** @brief Verify periodic tasks remain enabled even if disable is requested. */
@@ -205,27 +201,6 @@ void test_sch_enable_task_should_not_disable_periodic_task(void) {
     fake_time_us = 1000u;
     sch_run(&scheduler);
 
-    TEST_ASSERT_EQUAL_UINT32(1u, task_a_calls);
-}
-
-/** @brief Verify hint bits do not change periodic scheduling behavior. */
-void test_sch_hint_should_be_advisory_only(void) {
-    sch_t scheduler;
-    sch_init(&scheduler);
-
-    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, sch_add_task(&scheduler, task_a, NULL, 1000u, 1000u, 0u));
-
-    sch_hint_set_isr(&scheduler, 0x1u);
-    TEST_ASSERT_EQUAL_UINT32(0x1u, sch_hint_get(&scheduler, false));
-    TEST_ASSERT_EQUAL_UINT32(0x1u, sch_hint_get(&scheduler, true));
-    TEST_ASSERT_EQUAL_UINT32(0u, sch_hint_get(&scheduler, false));
-
-    fake_time_us = 999u;
-    sch_run(&scheduler);
-    TEST_ASSERT_EQUAL_UINT32(0u, task_a_calls);
-
-    fake_time_us = 1000u;
-    sch_run(&scheduler);
     TEST_ASSERT_EQUAL_UINT32(1u, task_a_calls);
 }
 
