@@ -8,6 +8,10 @@ set(CMAKE_C_EXTENSIONS OFF)
 add_library(scheduler STATIC
     src/scheduler.c
     src/isr_buffer.c
+    src/services/uart_service.c
+    src/services/ethernet_service.c
+    src/services/i2c_eeprom_service.c
+    src/services/motor_supervision_service.c
 )
 
 target_include_directories(scheduler
