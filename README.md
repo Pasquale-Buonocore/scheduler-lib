@@ -108,7 +108,15 @@ Call `sch_run()` repeatedly from the superloop. The scheduler will execute which
 cmake -S . -B build
 cmake --build build
 ./build/main_example
+./build/main_events_example
 ```
+
+`main_events_example` is a finite runtime demo (about 120 ms) that shows:
+- 1 ms control task,
+- periodic polling-first service tasks,
+- simulated ISR burst production into ring/event queues,
+- bounded service budgets per run,
+- background diagnostics with counters (processed, empty polls, drops).
 
 ## Test (Ceedling)
 
