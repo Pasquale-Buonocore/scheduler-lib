@@ -102,6 +102,65 @@ Call `sch_run()` repeatedly from the superloop. The scheduler will execute which
 - If several tasks are ready at once, priority affects selection.
 - Use a stable, monotonic tick source for predictable behavior.
 
+## Optional instrumentation and trace hooks
+
+The scheduler supports compile-time-gated observability features:
+
+- `SCH_ENABLE_STATS=1`: enables per-task counters/timestamps.
+- `SCH_ENABLE_TRACE=1`: enables trace callbacks for task start/end, miss,
+  overrun, and idle events.
+
+Both gates default to `0` and are fully compiled out when disabled.
+
+### CMake feature toggles
+
+You can enable these options from CMake:
+
+```bash
+cmake -S . -B build-instrumented -DSCH_ENABLE_STATS=ON -DSCH_ENABLE_TRACE=ON
+cmake --build build-instrumented
+```
+
+### Direct compiler defines (non-CMake integration)
+
+If you integrate sources into another embedded build system, define:
+
+```c
+-DSCH_ENABLE_STATS=1
+-DSCH_ENABLE_TRACE=1
+```
+
+### Stats API (enabled only with `SCH_ENABLE_STATS=1`)
+
+- `sch_get_task_stats(...)` returns a copy of per-task stats.
+- `sch_reset_stats(...)` clears all task stats in a scheduler instance.
+
+Per-task fields:
+
+- `run_count`, `miss_count`, `overrun_count`
+- `last_start_tick`, `last_end_tick`
+- `last_exec_ticks`, `max_exec_ticks`, `total_exec_ticks`
+
+### Trace hook API (enabled only with `SCH_ENABLE_TRACE=1`)
+
+Register hook with:
+
+- `sch_set_trace_hook(&scheduler, hook, user_ctx);`
+
+Callback contract:
+
+- runs synchronously inside `sch_run()`,
+- must be non-blocking and bounded,
+- must not call scheduler APIs reentrantly.
+
+### Performance boundaries
+
+- With both gates disabled, no instrumentation buffers, counters, or callback
+  branches are present in the compiled scheduler hot path.
+- With stats enabled, the scheduler performs bounded per-execution tick reads
+  and counter updates.
+- With tracing enabled, each emitted event is one guarded callback dispatch.
+
 ## Build (CMake)
 
 ```bash

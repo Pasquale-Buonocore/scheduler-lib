@@ -13,6 +13,34 @@
 
 #define SCH_LOWEST_PRIORITY (255u)
 
+#if (SCH_ENABLE_TRACE == 1)
+/**
+ * @brief Emit trace event if tracing is enabled and callback is set.
+ */
+static inline void sch_trace_emit(
+    sch_t *scheduler, sch_trace_event_t event, int32_t task_id, uint32_t timestamp) {
+    if ((scheduler != NULL) && (scheduler->trace_hook != NULL)) {
+        scheduler->trace_hook(event, task_id, timestamp, scheduler->trace_user_ctx);
+    }
+}
+#endif
+
+#if (SCH_ENABLE_STATS == 1)
+/**
+ * @brief Initialize one stats slot.
+ */
+static inline void sch_stats_clear_slot(sch_task_stats_t *stats) {
+    stats->run_count = 0u;
+    stats->miss_count = 0u;
+    stats->overrun_count = 0u;
+    stats->last_start_tick = 0u;
+    stats->last_end_tick = 0u;
+    stats->last_exec_ticks = 0u;
+    stats->max_exec_ticks = 0u;
+    stats->total_exec_ticks = 0u;
+}
+#endif
+
 /**
  * @brief Check whether a target tick has been reached.
  *
@@ -80,6 +108,15 @@ void sch_init(sch_t *scheduler) {
     }
     scheduler->task_count = 0u;
     scheduler->next_background_idx = 0u;
+#if (SCH_ENABLE_STATS == 1)
+    for (uint32_t i = 0u; i < SCH_MAX_TASKS; ++i) {
+        sch_stats_clear_slot(&scheduler->stats[i]);
+    }
+#endif
+#if (SCH_ENABLE_TRACE == 1)
+    scheduler->trace_hook = NULL;
+    scheduler->trace_user_ctx = NULL;
+#endif
     sch_port_exit_critical(state);
 }
 
@@ -123,6 +160,9 @@ int32_t sch_add_task(
             scheduler->tasks[i].enabled = true;
             scheduler->tasks[i].pending = false;
             scheduler->tasks[i].in_use = true;
+#if (SCH_ENABLE_STATS == 1)
+            sch_stats_clear_slot(&scheduler->stats[i]);
+#endif
             scheduler->task_count++;
             sch_port_exit_critical(state);
             return (int32_t)i;
@@ -160,6 +200,16 @@ static void sch_mark_periodic_ready(sch_t *scheduler, uint32_t now) {
         }
 
         if (sch_time_reached(now, task->next_release)) {
+#if (SCH_ENABLE_STATS == 1)
+            if (task->pending) {
+                scheduler->stats[i].miss_count++;
+            }
+#endif
+#if (SCH_ENABLE_TRACE == 1)
+            if (task->pending) {
+                sch_trace_emit(scheduler, SCH_TRACE_TASK_MISS, (int32_t)i, now);
+            }
+#endif
             task->pending = true;
         }
     }
@@ -257,7 +307,49 @@ void sch_run(sch_t *scheduler) {
         task->next_release = sch_advance_next_release(now, next_release, period);
 
         sch_port_exit_critical(state);
+
+#if (SCH_ENABLE_STATS == 1)
+        uint32_t exec_start = sch_port_now_ticks();
+        scheduler->stats[selected].last_start_tick = exec_start;
+#endif
+#if (SCH_ENABLE_TRACE == 1)
+        sch_trace_emit(scheduler, SCH_TRACE_TASK_START, selected, sch_port_now_ticks());
+#endif
         fn(ctx);
+
+#if (SCH_ENABLE_STATS == 1)
+        uint32_t exec_end = sch_port_now_ticks();
+        sch_task_stats_t *stats = &scheduler->stats[selected];
+        uint32_t exec_ticks = exec_end - stats->last_start_tick;
+
+        stats->run_count++;
+        stats->last_end_tick = exec_end;
+        stats->last_exec_ticks = exec_ticks;
+        stats->total_exec_ticks += exec_ticks;
+        if (exec_ticks > stats->max_exec_ticks) {
+            stats->max_exec_ticks = exec_ticks;
+        }
+#endif
+#if (SCH_ENABLE_TRACE == 1)
+        uint32_t trace_end = sch_port_now_ticks();
+        sch_trace_emit(scheduler, SCH_TRACE_TASK_END, selected, trace_end);
+#endif
+
+        /*
+         * Overrun detection compares task completion time against the release
+         * planned immediately after this execution.
+         */
+        uint32_t completed_at = sch_port_now_ticks();
+        if (period != 0u) {
+            if (sch_time_reached(completed_at, task->next_release)) {
+#if (SCH_ENABLE_STATS == 1)
+                scheduler->stats[selected].overrun_count++;
+#endif
+#if (SCH_ENABLE_TRACE == 1)
+                sch_trace_emit(scheduler, SCH_TRACE_TASK_OVERRUN, selected, completed_at);
+#endif
+            }
+        }
     }
 
     uint32_t background_state = sch_port_enter_critical();
@@ -272,8 +364,71 @@ void sch_run(sch_t *scheduler) {
     sch_port_exit_critical(background_state);
 
     if (background_fn != NULL) {
+#if (SCH_ENABLE_TRACE == 1)
+        sch_trace_emit(scheduler, SCH_TRACE_TASK_START, background_id, sch_port_now_ticks());
+#endif
+#if (SCH_ENABLE_STATS == 1)
+        uint32_t exec_start = sch_port_now_ticks();
+        scheduler->stats[background_id].last_start_tick = exec_start;
+#endif
         background_fn(background_ctx);
+#if (SCH_ENABLE_STATS == 1)
+        uint32_t exec_end = sch_port_now_ticks();
+        sch_task_stats_t *stats = &scheduler->stats[background_id];
+        uint32_t exec_ticks = exec_end - stats->last_start_tick;
+
+        stats->run_count++;
+        stats->last_end_tick = exec_end;
+        stats->last_exec_ticks = exec_ticks;
+        stats->total_exec_ticks += exec_ticks;
+        if (exec_ticks > stats->max_exec_ticks) {
+            stats->max_exec_ticks = exec_ticks;
+        }
+#endif
+#if (SCH_ENABLE_TRACE == 1)
+        sch_trace_emit(scheduler, SCH_TRACE_TASK_END, background_id, sch_port_now_ticks());
+#endif
     } else {
+#if (SCH_ENABLE_TRACE == 1)
+        sch_trace_emit(scheduler, SCH_TRACE_IDLE, SCH_INVALID_TASK_ID, sch_port_now_ticks());
+#endif
         sch_port_idle();
     }
 }
+
+#if (SCH_ENABLE_STATS == 1)
+void sch_reset_stats(sch_t *scheduler) {
+    if (scheduler == NULL) {
+        return;
+    }
+
+    uint32_t state = sch_port_enter_critical();
+    for (uint32_t i = 0u; i < SCH_MAX_TASKS; ++i) {
+        sch_stats_clear_slot(&scheduler->stats[i]);
+    }
+    sch_port_exit_critical(state);
+}
+
+bool sch_get_task_stats(const sch_t *scheduler, uint32_t task_id, sch_task_stats_t *out_stats) {
+    if ((scheduler == NULL) || (out_stats == NULL) || (task_id >= SCH_MAX_TASKS) ||
+        !scheduler->tasks[task_id].in_use) {
+        return false;
+    }
+
+    *out_stats = scheduler->stats[task_id];
+    return true;
+}
+#endif
+
+#if (SCH_ENABLE_TRACE == 1)
+void sch_set_trace_hook(sch_t *scheduler, sch_trace_hook_t hook, void *user_ctx) {
+    if (scheduler == NULL) {
+        return;
+    }
+
+    uint32_t state = sch_port_enter_critical();
+    scheduler->trace_hook = hook;
+    scheduler->trace_user_ctx = user_ctx;
+    sch_port_exit_critical(state);
+}
+#endif
