@@ -80,6 +80,7 @@ void sch_init(sch_t *scheduler) {
     }
     scheduler->task_count = 0u;
     scheduler->next_background_idx = 0u;
+    scheduler->hint_mask = 0u;
     sch_port_exit_critical(state);
 }
 
@@ -147,12 +148,48 @@ void sch_enable_task(sch_t *scheduler, uint32_t task_id, bool enable) {
 
     uint32_t state = sch_port_enter_critical();
     if (scheduler->tasks[task_id].in_use) {
-        scheduler->tasks[task_id].enabled = enable;
+        sch_task_t *task = &scheduler->tasks[task_id];
+        if ((task->period_ticks > 0u) && (!enable)) {
+            /*
+             * Periodic service tasks remain always enabled in the hybrid
+             * polling-first model. ISR-side hints are advisory only and must
+             * not activate/deactivate periodic service execution.
+             */
+            sch_port_exit_critical(state);
+            return;
+        }
+
+        task->enabled = enable;
         if (!enable) {
             scheduler->tasks[task_id].pending = false;
         }
     }
     sch_port_exit_critical(state);
+}
+
+void sch_hint_set_isr(sch_t *scheduler, sch_hint_mask_t mask) {
+    if (scheduler == NULL) {
+        return;
+    }
+
+    uint32_t state = sch_port_enter_critical();
+    scheduler->hint_mask |= mask;
+    sch_port_exit_critical(state);
+}
+
+sch_hint_mask_t sch_hint_get(sch_t *scheduler, bool clear) {
+    if (scheduler == NULL) {
+        return 0u;
+    }
+
+    uint32_t state = sch_port_enter_critical();
+    sch_hint_mask_t snapshot = scheduler->hint_mask;
+    if (clear) {
+        scheduler->hint_mask = 0u;
+    }
+    sch_port_exit_critical(state);
+
+    return snapshot;
 }
 
 /**
@@ -236,10 +273,19 @@ void sch_run(sch_t *scheduler) {
         return;
     }
 
-    for (;;) {
-        uint32_t state = sch_port_enter_critical();
-        uint32_t now = sch_port_now_ticks();
-        sch_mark_periodic_ready(scheduler, now);
+    uint32_t state = sch_port_enter_critical();
+    uint32_t now = sch_port_now_ticks();
+    sch_mark_periodic_ready(scheduler, now);
+    sch_port_exit_critical(state);
+
+    /*
+     * Process only the ready set collected at run entry. This bounds the
+     * periodic workload of one scheduler cycle to at most SCH_MAX_TASKS
+     * callbacks and prevents overload from turning one run into an unbounded
+     * catch-up loop.
+     */
+    for (uint32_t executed_periodic = 0u; executed_periodic < SCH_MAX_TASKS; ++executed_periodic) {
+        state = sch_port_enter_critical();
         int32_t selected = sch_select_pending_task(scheduler);
 
         if (selected == SCH_INVALID_TASK_ID) {
@@ -260,7 +306,7 @@ void sch_run(sch_t *scheduler) {
         fn(ctx);
     }
 
-    uint32_t state = sch_port_enter_critical();
+    uint32_t background_state = sch_port_enter_critical();
     int32_t background_id = sch_select_background_task(scheduler);
     sch_task_fn_t background_fn = NULL;
     void *background_ctx = NULL;
@@ -269,7 +315,7 @@ void sch_run(sch_t *scheduler) {
         background_fn = scheduler->tasks[background_id].fn;
         background_ctx = scheduler->tasks[background_id].ctx;
     }
-    sch_port_exit_critical(state);
+    sch_port_exit_critical(background_state);
 
     if (background_fn != NULL) {
         background_fn(background_ctx);

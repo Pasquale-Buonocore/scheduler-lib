@@ -21,6 +21,13 @@ static uint32_t bg_calls;
 static uint8_t call_trace[16];
 /** @brief Number of valid entries in @ref call_trace. */
 static uint32_t call_trace_len;
+/** @brief Optional function used by a test task to mutate fake time. */
+static void (*task_a_hook)(void);
+
+/** @brief Test hook that advances fake time by one period. */
+static void hook_advance_time_by_period(void) {
+    fake_time_us += 100u;
+}
 
 /** @brief Port stub: return fake time. */
 uint32_t sch_port_now_ticks(void) {
@@ -51,6 +58,9 @@ static void task_a(void *ctx) {
     (void)ctx;
     task_a_calls++;
     call_trace[call_trace_len++] = (uint8_t)'A';
+    if (task_a_hook != NULL) {
+        task_a_hook();
+    }
 }
 
 /**
@@ -83,6 +93,7 @@ void setUp(void) {
     task_b_calls = 0u;
     bg_calls = 0u;
     call_trace_len = 0u;
+    task_a_hook = NULL;
 }
 
 /** @brief Unity teardown hook. */
@@ -164,8 +175,26 @@ void test_sch_run_should_call_idle_when_nothing_to_execute(void) {
     TEST_ASSERT_EQUAL_UINT32(1u, idle_call_count);
 }
 
-/** @brief Verify tasks can be disabled and enabled at runtime. */
-void test_sch_enable_task_should_disable_and_enable_task(void) {
+/** @brief Verify background tasks can be disabled and enabled at runtime. */
+void test_sch_enable_task_should_disable_and_enable_background_task(void) {
+    sch_t scheduler;
+    sch_init(&scheduler);
+
+    int32_t id = sch_add_task(&scheduler, background_task, NULL, 0u, 0u, 0u);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, id);
+
+    sch_enable_task(&scheduler, (uint32_t)id, false);
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(0u, bg_calls);
+    TEST_ASSERT_EQUAL_UINT32(1u, idle_call_count);
+
+    sch_enable_task(&scheduler, (uint32_t)id, true);
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(1u, bg_calls);
+}
+
+/** @brief Verify periodic tasks remain enabled even if disable is requested. */
+void test_sch_enable_task_should_not_disable_periodic_task(void) {
     sch_t scheduler;
     sch_init(&scheduler);
 
@@ -175,9 +204,44 @@ void test_sch_enable_task_should_disable_and_enable_task(void) {
     sch_enable_task(&scheduler, (uint32_t)id, false);
     fake_time_us = 1000u;
     sch_run(&scheduler);
+
+    TEST_ASSERT_EQUAL_UINT32(1u, task_a_calls);
+}
+
+/** @brief Verify hint bits do not change periodic scheduling behavior. */
+void test_sch_hint_should_be_advisory_only(void) {
+    sch_t scheduler;
+    sch_init(&scheduler);
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, sch_add_task(&scheduler, task_a, NULL, 1000u, 1000u, 0u));
+
+    sch_hint_set_isr(&scheduler, 0x1u);
+    TEST_ASSERT_EQUAL_UINT32(0x1u, sch_hint_get(&scheduler, false));
+    TEST_ASSERT_EQUAL_UINT32(0x1u, sch_hint_get(&scheduler, true));
+    TEST_ASSERT_EQUAL_UINT32(0u, sch_hint_get(&scheduler, false));
+
+    fake_time_us = 999u;
+    sch_run(&scheduler);
     TEST_ASSERT_EQUAL_UINT32(0u, task_a_calls);
 
-    sch_enable_task(&scheduler, (uint32_t)id, true);
+    fake_time_us = 1000u;
     sch_run(&scheduler);
     TEST_ASSERT_EQUAL_UINT32(1u, task_a_calls);
+}
+
+/** @brief Verify a scheduler run executes a bounded periodic ready set once. */
+void test_sch_run_should_bound_periodic_work_per_cycle(void) {
+    sch_t scheduler;
+    sch_init(&scheduler);
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, sch_add_task(&scheduler, task_a, NULL, 100u, 100u, 0u));
+    task_a_hook = hook_advance_time_by_period;
+    fake_time_us = 100u;
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(1u, task_a_calls);
+
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(2u, task_a_calls);
+
+    task_a_hook = NULL;
 }

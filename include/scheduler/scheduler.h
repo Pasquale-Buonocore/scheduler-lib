@@ -32,6 +32,8 @@ extern "C" {
  * @param ctx Opaque caller-provided context.
  */
 typedef void (*sch_task_fn_t)(void *ctx);
+/** @brief Advisory hint bitmask type for ISR-to-task signaling. */
+typedef uint32_t sch_hint_mask_t;
 
 /**
  * @brief Task control block used internally by the scheduler.
@@ -54,6 +56,7 @@ typedef struct {
     sch_task_t tasks[SCH_MAX_TASKS]; /**< Static task storage. */
     uint32_t task_count;             /**< Number of allocated task slots. */
     uint32_t next_background_idx;    /**< Round-robin cursor for background tasks. */
+    volatile sch_hint_mask_t hint_mask; /**< Advisory scheduler-level hint bits. */
 } sch_t;
 
 /**
@@ -91,6 +94,27 @@ int32_t sch_add_task(
  * @param enable true to enable, false to disable.
  */
 void sch_enable_task(sch_t *scheduler, uint32_t task_id, bool enable);
+
+/**
+ * @brief Set advisory hint bits from ISR or foreground context.
+ *
+ * Hint bits are advisory only: they never activate/deactivate tasks and do not
+ * affect periodic dispatch order.
+ *
+ * @param scheduler Scheduler instance.
+ * @param mask Hint bits to OR into the scheduler hint mask.
+ */
+void sch_hint_set_isr(sch_t *scheduler, sch_hint_mask_t mask);
+
+/**
+ * @brief Read and optionally clear advisory hint bits.
+ *
+ * @param scheduler Scheduler instance.
+ * @param clear true to clear currently latched bits after reading.
+ *
+ * @return Current hint mask snapshot, or 0 when @p scheduler is NULL.
+ */
+sch_hint_mask_t sch_hint_get(sch_t *scheduler, bool clear);
 
 /**
  * @brief Execute one cooperative scheduling cycle.
