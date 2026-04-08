@@ -5,6 +5,7 @@
 
 #include "unity.h"
 
+#include "scheduler/isr_buffer.h"
 #include "scheduler/scheduler.h"
 
 /** @brief Fake time source used by scheduler port stubs. */
@@ -23,6 +24,31 @@ static uint8_t call_trace[16];
 static uint32_t call_trace_len;
 /** @brief Optional function used by a test task to mutate fake time. */
 static void (*task_a_hook)(void);
+
+typedef struct {
+    sch_event_queue_t queue;
+    uint16_t storage[4];
+    volatile bool hint;
+    size_t max_items_per_run;
+    uint32_t run_count;
+    uint32_t empty_returns;
+    uint32_t processed_count;
+    uint32_t last_event_id;
+} polling_service_t;
+
+typedef struct {
+    polling_service_t *service;
+    uint16_t next_event_id;
+    uint32_t produce_count;
+    uint32_t first_produced_tick;
+    uint32_t last_produced_tick;
+} producer_task_ctx_t;
+
+typedef struct {
+    polling_service_t *service;
+    uint32_t consume_count;
+    uint32_t first_consumed_tick;
+} consumer_task_ctx_t;
 #if (SCH_ENABLE_TRACE == 1)
 /** @brief Count of trace hook invocations. */
 static uint32_t trace_call_count;
@@ -89,6 +115,69 @@ static void background_task(void *ctx) {
     (void)ctx;
     bg_calls++;
     call_trace[call_trace_len++] = (uint8_t)'G';
+}
+
+static void polling_service_reset(polling_service_t *service, size_t max_items_per_run) {
+    (void)sch_event_queue_init(
+        &service->queue, service->storage, 4u, SCH_OVERFLOW_DROP_NEWEST);
+    service->hint = false;
+    service->max_items_per_run = max_items_per_run;
+    service->run_count = 0u;
+    service->empty_returns = 0u;
+    service->processed_count = 0u;
+    service->last_event_id = 0u;
+}
+
+static void polling_service_push_event(polling_service_t *service, uint16_t event_id, bool set_hint) {
+    (void)sch_event_queue_push_isr(&service->queue, event_id);
+    if (set_hint) {
+        service->hint = true;
+    }
+}
+
+static void polling_service_task(void *ctx) {
+    polling_service_t *service = (polling_service_t *)ctx;
+    service->run_count++;
+
+    if (!service->hint && (sch_event_queue_size(&service->queue) == 0u)) {
+        service->empty_returns++;
+        return;
+    }
+
+    service->hint = false;
+
+    uint16_t event_id = 0u;
+    for (size_t i = 0u; i < service->max_items_per_run; ++i) {
+        if (!sch_event_queue_pop_task(&service->queue, &event_id)) {
+            break;
+        }
+
+        service->processed_count++;
+        service->last_event_id = (uint32_t)event_id;
+    }
+}
+
+static void producer_task(void *ctx) {
+    producer_task_ctx_t *producer = (producer_task_ctx_t *)ctx;
+
+    polling_service_push_event(producer->service, producer->next_event_id++, false);
+    producer->produce_count++;
+    if (producer->first_produced_tick == 0u) {
+        producer->first_produced_tick = fake_time_us;
+    }
+    producer->last_produced_tick = fake_time_us;
+}
+
+static void consumer_task(void *ctx) {
+    consumer_task_ctx_t *consumer = (consumer_task_ctx_t *)ctx;
+    uint16_t event_id = 0u;
+
+    if (sch_event_queue_pop_task(&consumer->service->queue, &event_id)) {
+        consumer->consume_count++;
+        if (consumer->first_consumed_tick == 0u) {
+            consumer->first_consumed_tick = fake_time_us;
+        }
+    }
 }
 
 /** @brief Unity setup hook. */
@@ -229,6 +318,107 @@ void test_sch_run_should_bound_periodic_work_per_cycle(void) {
     TEST_ASSERT_EQUAL_UINT32(2u, task_a_calls);
 
     task_a_hook = NULL;
+}
+
+void test_polling_service_should_run_periodically_and_return_cleanly_when_empty(void) {
+    sch_t scheduler;
+    polling_service_t service;
+    sch_init(&scheduler);
+    polling_service_reset(&service, 2u);
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, sch_add_task(&scheduler, polling_service_task, &service, 1000u, 1000u, 5u));
+
+    fake_time_us = 1000u;
+    sch_run(&scheduler);
+
+    TEST_ASSERT_EQUAL_UINT32(1u, service.run_count);
+    TEST_ASSERT_EQUAL_UINT32(1u, service.empty_returns);
+    TEST_ASSERT_EQUAL_UINT32(0u, service.processed_count);
+    TEST_ASSERT_EQUAL_UINT32(0u, (uint32_t)sch_event_queue_size(&service.queue));
+
+    fake_time_us = 2000u;
+    sch_run(&scheduler);
+
+    TEST_ASSERT_EQUAL_UINT32(2u, service.run_count);
+    TEST_ASSERT_EQUAL_UINT32(2u, service.empty_returns);
+    TEST_ASSERT_EQUAL_UINT32(0u, service.processed_count);
+}
+
+void test_polling_service_should_defer_backlog_across_periodic_runs_with_bounded_work(void) {
+    sch_t scheduler;
+    polling_service_t service;
+    sch_init(&scheduler);
+    polling_service_reset(&service, 1u);
+    polling_service_push_event(&service, 10u, false);
+    polling_service_push_event(&service, 11u, false);
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, sch_add_task(&scheduler, polling_service_task, &service, 1000u, 1000u, 5u));
+
+    fake_time_us = 1000u;
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(1u, service.run_count);
+    TEST_ASSERT_EQUAL_UINT32(1u, service.processed_count);
+    TEST_ASSERT_EQUAL_UINT32(1u, (uint32_t)sch_event_queue_size(&service.queue));
+
+    fake_time_us = 2000u;
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(2u, service.run_count);
+    TEST_ASSERT_EQUAL_UINT32(2u, service.processed_count);
+    TEST_ASSERT_EQUAL_UINT32(11u, service.last_event_id);
+    TEST_ASSERT_EQUAL_UINT32(0u, (uint32_t)sch_event_queue_size(&service.queue));
+}
+
+void test_polling_service_should_treat_hint_as_advisory_only(void) {
+    sch_t scheduler;
+    polling_service_t service;
+    sch_init(&scheduler);
+    polling_service_reset(&service, 2u);
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, sch_add_task(&scheduler, polling_service_task, &service, 1000u, 1000u, 5u));
+
+    service.hint = true;
+    fake_time_us = 1000u;
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(1u, service.run_count);
+    TEST_ASSERT_EQUAL_UINT32(0u, service.processed_count);
+    TEST_ASSERT_FALSE(service.hint);
+
+    polling_service_push_event(&service, 55u, false);
+    fake_time_us = 2000u;
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(2u, service.run_count);
+    TEST_ASSERT_EQUAL_UINT32(1u, service.processed_count);
+    TEST_ASSERT_EQUAL_UINT32(55u, service.last_event_id);
+}
+
+void test_polling_service_latency_should_be_bounded_by_one_period_when_consumer_runs_before_producer(void) {
+    sch_t scheduler;
+    polling_service_t service;
+    producer_task_ctx_t producer = {0};
+    consumer_task_ctx_t consumer = {0};
+
+    sch_init(&scheduler);
+    polling_service_reset(&service, 1u);
+
+    producer.service = &service;
+    producer.next_event_id = 1u;
+    consumer.service = &service;
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, sch_add_task(&scheduler, consumer_task, &consumer, 1000u, 1000u, 0u));
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, sch_add_task(&scheduler, producer_task, &producer, 1000u, 1000u, 1u));
+
+    fake_time_us = 1000u;
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(1u, producer.produce_count);
+    TEST_ASSERT_EQUAL_UINT32(0u, consumer.consume_count);
+    TEST_ASSERT_EQUAL_UINT32(1u, (uint32_t)sch_event_queue_size(&service.queue));
+
+    fake_time_us = 2000u;
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(2u, producer.produce_count);
+    TEST_ASSERT_EQUAL_UINT32(1u, consumer.consume_count);
+    TEST_ASSERT_EQUAL_UINT32(2000u, consumer.first_consumed_tick);
+    TEST_ASSERT_EQUAL_UINT32(1000u, consumer.first_consumed_tick - producer.first_produced_tick);
 }
 
 #if (SCH_ENABLE_STATS == 1)
