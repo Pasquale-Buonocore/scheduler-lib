@@ -15,6 +15,8 @@ add_library(scheduler STATIC
     src/services/ethernet_service.c
     src/services/i2c_eeprom_service.c
     src/services/motor_supervision_service.c
+    src/services/fsi_service.c
+    src/services/ipc_service.c
 )
 
 target_include_directories(scheduler
