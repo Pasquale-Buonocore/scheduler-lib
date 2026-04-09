@@ -1,4 +1,5 @@
 #include "scheduler/services/ethernet_service.h"
+#include "scheduler/port/scheduler_port.h"
 
 bool sch_eth_service_init(
     sch_eth_service_t *service,
@@ -26,7 +27,9 @@ static void sch_eth_push_event_isr(sch_eth_service_t *service, sch_eth_event_id_
 
     service->hal.ack_irq(service->hal.hal_ctx);
     (void)sch_event_queue_push_isr(&service->event_queue, (uint16_t)event_id);
+    uint32_t state = sch_port_enter_critical();
     service->irq_hint = true;
+    sch_port_exit_critical(state);
 }
 
 void sch_eth_isr_rx(sch_eth_service_t *service) {
@@ -43,12 +46,19 @@ void sch_eth_isr_link(sch_eth_service_t *service) {
 
 void sch_eth_service_run(void *ctx) {
     sch_eth_service_t *service = (sch_eth_service_t *)ctx;
-    if ((service == NULL) ||
-        (!service->irq_hint && (sch_event_queue_size(&service->event_queue) == 0u))) {
+    if (service == NULL) {
         return;
     }
 
+    bool had_irq_hint = false;
+    uint32_t state = sch_port_enter_critical();
+    had_irq_hint = service->irq_hint;
     service->irq_hint = false;
+    sch_port_exit_critical(state);
+
+    if (!had_irq_hint && (sch_event_queue_size(&service->event_queue) == 0u)) {
+        return;
+    }
 
     uint16_t event_id = 0u;
     for (size_t i = 0u; i < service->max_events_per_run; ++i) {

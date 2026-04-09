@@ -46,6 +46,7 @@ typedef struct {
 typedef struct {
     sch_ipc_hal_t hal;
     sch_spsc_ring_t irq_records;
+    /** ISR/task advisory bits; set/read/clear must be inside sch_port critical sections. */
     volatile uint32_t event_bits;
     size_t max_records_per_run;
 } sch_ipc_service_t;

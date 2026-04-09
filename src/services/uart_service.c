@@ -1,4 +1,5 @@
 #include "scheduler/services/uart_service.h"
+#include "scheduler/port/scheduler_port.h"
 
 bool sch_uart_service_init(
     sch_uart_service_t *service,
@@ -41,7 +42,9 @@ void sch_uart_isr_rx(sch_uart_service_t *service) {
     uint16_t byte = 0u;
     if (service->hal.try_read_byte(service->hal.hal_ctx, &byte)) {
         (void)sch_spsc_ring_push_isr(&service->rx_ring, &byte);
+        uint32_t state = sch_port_enter_critical();
         service->rx_hint = true;
+        sch_port_exit_critical(state);
     }
 }
 
@@ -54,7 +57,9 @@ void sch_uart_isr_tx_ready(sch_uart_service_t *service) {
         service->hal.ack_irq(service->hal.hal_ctx);
     }
 
+    uint32_t state = sch_port_enter_critical();
     service->tx_hint = true;
+    sch_port_exit_critical(state);
 }
 
 bool sch_uart_service_queue_tx(sch_uart_service_t *service, uint16_t byte) {
@@ -71,13 +76,19 @@ void sch_uart_service_run(void *ctx) {
         return;
     }
 
-    if (!service->rx_hint && !service->tx_hint && sch_spsc_ring_is_empty(&service->rx_ring) &&
+    bool had_rx_hint = false;
+    bool had_tx_hint = false;
+    uint32_t state = sch_port_enter_critical();
+    had_rx_hint = service->rx_hint;
+    had_tx_hint = service->tx_hint;
+    service->rx_hint = false;
+    service->tx_hint = false;
+    sch_port_exit_critical(state);
+
+    if (!had_rx_hint && !had_tx_hint && sch_spsc_ring_is_empty(&service->rx_ring) &&
         sch_spsc_ring_is_empty(&service->tx_ring)) {
         return;
     }
-
-    service->rx_hint = false;
-    service->tx_hint = false;
 
     uint16_t byte = 0u;
     for (size_t i = 0u; i < service->max_tx_items_per_run; ++i) {

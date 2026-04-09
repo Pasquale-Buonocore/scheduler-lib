@@ -22,6 +22,7 @@ typedef struct {
     sch_uart_hal_t hal;
     sch_spsc_ring_t rx_ring;
     sch_spsc_ring_t tx_ring;
+    /** ISR/task wake hints; reads/writes are guarded by sch_port critical sections. */
     volatile bool rx_hint;
     volatile bool tx_hint;
     size_t max_rx_items_per_run;

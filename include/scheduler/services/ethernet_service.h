@@ -28,6 +28,7 @@ typedef struct {
 typedef struct {
     sch_eth_hal_t hal;
     sch_event_queue_t event_queue;
+    /** ISR/task wake hint; set/read/clear must be inside sch_port critical sections. */
     volatile bool irq_hint;
     size_t max_events_per_run;
 } sch_eth_service_t;

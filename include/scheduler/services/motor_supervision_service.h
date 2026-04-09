@@ -35,6 +35,7 @@ typedef struct {
     sch_event_queue_t event_queue;
     uint16_t target_speed_rpm;
     bool enabled;
+    /** ISR/task wake hint; set/read/clear must be inside sch_port critical sections. */
     volatile bool irq_hint;
     size_t max_feedback_items_per_run;
     size_t max_events_per_run;
