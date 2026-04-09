@@ -19,7 +19,7 @@ static uint32_t task_b_calls;
 /** @brief Count of background task executions. */
 static uint32_t bg_calls;
 /** @brief Execution trace buffer for ordering checks. */
-static uint8_t call_trace[16];
+static uint16_t call_trace[16];
 /** @brief Number of valid entries in @ref call_trace. */
 static uint32_t call_trace_len;
 /** @brief Optional function used by a test task to mutate fake time. */
@@ -89,7 +89,7 @@ void sch_port_idle(void) {
 static void task_a(void *ctx) {
     (void)ctx;
     task_a_calls++;
-    call_trace[call_trace_len++] = (uint8_t)'A';
+    call_trace[call_trace_len++] = 'A';
     if (task_a_hook != NULL) {
         task_a_hook();
     }
@@ -103,7 +103,7 @@ static void task_a(void *ctx) {
 static void task_b(void *ctx) {
     (void)ctx;
     task_b_calls++;
-    call_trace[call_trace_len++] = (uint8_t)'B';
+    call_trace[call_trace_len++] = 'B';
 }
 
 /**
@@ -114,7 +114,7 @@ static void task_b(void *ctx) {
 static void background_task(void *ctx) {
     (void)ctx;
     bg_calls++;
-    call_trace[call_trace_len++] = (uint8_t)'G';
+    call_trace[call_trace_len++] = 'G';
 }
 
 static void polling_service_reset(polling_service_t *service, size_t max_items_per_run) {
@@ -223,8 +223,8 @@ void test_sch_run_should_execute_ready_tasks_by_priority(void) {
     TEST_ASSERT_EQUAL_UINT32(1u, task_b_calls);
     TEST_ASSERT_EQUAL_UINT32(0u, idle_call_count);
     TEST_ASSERT_EQUAL_UINT32(2u, call_trace_len);
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)'A', call_trace[0]);
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)'B', call_trace[1]);
+    TEST_ASSERT_EQUAL_UINT16('A', call_trace[0]);
+    TEST_ASSERT_EQUAL_UINT16('B', call_trace[1]);
 }
 
 /** @brief Verify bounded catch-up for delayed periodic execution. */
