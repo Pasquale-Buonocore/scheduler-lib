@@ -8,6 +8,7 @@ This library lets you register periodic and background tasks, then run them in a
 
 - This README is the **authoritative source** for the library's currently supported behavior and current skeleton-module limitations.
 - Files under `docs/codex_instructions/` are **design/backlog artifacts** used to guide implementation planning and AI tasking. They may include historical TODO items that are already complete or items intentionally not implemented in the current architecture.
+- Release readiness checklist: see `docs/release_readiness.md` before claiming production readiness.
 
 ## Why this library
 
