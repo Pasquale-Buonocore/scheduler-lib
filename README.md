@@ -73,6 +73,22 @@ int main(void) {
 - **Priority:** used when multiple tasks are ready at once.
 - **Run-to-completion:** callbacks should be bounded and non-blocking.
 
+## API behavior policy: no runtime disable support
+
+The `sch_enable_task()` API is preserved as a **compatibility shim** only.
+
+- Calling `sch_enable_task(..., true)` does not change scheduler behavior.
+- Calling `sch_enable_task(..., false)` also does not disable a task.
+- This is intentional: **disable is intentionally unsupported by design**.
+
+### Rationale
+
+- Keeps scheduler behavior deterministic and simple for safety-oriented superloop use.
+- Avoids runtime mode changes that can hide periodic/background work unexpectedly.
+- Preserves source compatibility for projects that already call a legacy enable/disable API.
+
+If you need conditional execution, keep tasks registered and gate work inside the task callback using application-owned state.
+
 ## Configuration reference
 
 | Macro | Default | Meaning |

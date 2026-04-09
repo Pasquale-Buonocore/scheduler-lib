@@ -150,11 +150,16 @@ int32_t sch_add_task(
     uint16_t priority);
 
 /**
- * @brief Compatibility API: task enable/disable runtime control is unsupported.
+ * @brief Compatibility API only; disable is intentionally unsupported by design.
+ *
+ * This function is retained for source compatibility with integrations that call
+ * a legacy runtime enable/disable API. The scheduler intentionally does not
+ * support runtime task disable semantics by design, so calls with either
+ * `enable=true` or `enable=false` are no-ops.
  *
  * @param scheduler Scheduler instance.
  * @param task_id Task identifier returned by @ref sch_add_task.
- * @param enable Unused.
+ * @param enable Ignored; disable is intentionally unsupported by design.
  */
 void sch_enable_task(sch_t *scheduler, uint32_t task_id, bool enable);
 
