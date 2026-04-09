@@ -274,7 +274,7 @@ void test_sch_run_should_call_idle_when_nothing_to_execute(void) {
     TEST_ASSERT_EQUAL_UINT32(1u, idle_call_count);
 }
 
-/** @brief Verify runtime enable/disable API does not affect background tasks. */
+/** @brief Verify disable requests do not suppress background task execution. */
 void test_sch_enable_task_should_not_disable_background_task(void) {
     sch_t scheduler;
     sch_init(&scheduler);
@@ -284,11 +284,16 @@ void test_sch_enable_task_should_not_disable_background_task(void) {
 
     sch_enable_task(&scheduler, (uint32_t)id, false);
     sch_run(&scheduler);
-    TEST_ASSERT_EQUAL_UINT32(1u, bg_calls);
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(2u, bg_calls);
+
+    sch_enable_task(&scheduler, (uint32_t)id, false);
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(3u, bg_calls);
     TEST_ASSERT_EQUAL_UINT32(0u, idle_call_count);
 }
 
-/** @brief Verify periodic tasks remain enabled even if disable is requested. */
+/** @brief Verify disable requests do not suppress periodic task releases. */
 void test_sch_enable_task_should_not_disable_periodic_task(void) {
     sch_t scheduler;
     sch_init(&scheduler);
@@ -299,8 +304,35 @@ void test_sch_enable_task_should_not_disable_periodic_task(void) {
     sch_enable_task(&scheduler, (uint32_t)id, false);
     fake_time_us = 1000u;
     sch_run(&scheduler);
+    fake_time_us = 2000u;
+    sch_run(&scheduler);
 
+    TEST_ASSERT_EQUAL_UINT32(2u, task_a_calls);
+}
+
+/** @brief Verify `enable=true` and `enable=false` calls leave behavior unchanged. */
+void test_sch_enable_task_should_behave_identically_for_true_and_false_flags(void) {
+    sch_t scheduler;
+    sch_init(&scheduler);
+
+    int32_t periodic_id = sch_add_task(&scheduler, task_a, NULL, 1000u, 1000u, 0u);
+    int32_t background_id = sch_add_task(&scheduler, background_task, NULL, 0u, 0u, 10u);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, periodic_id);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT32(0, background_id);
+
+    sch_enable_task(&scheduler, (uint32_t)periodic_id, true);
+    sch_enable_task(&scheduler, (uint32_t)background_id, false);
+    fake_time_us = 1000u;
+    sch_run(&scheduler);
     TEST_ASSERT_EQUAL_UINT32(1u, task_a_calls);
+    TEST_ASSERT_EQUAL_UINT32(1u, bg_calls);
+
+    sch_enable_task(&scheduler, (uint32_t)periodic_id, false);
+    sch_enable_task(&scheduler, (uint32_t)background_id, true);
+    fake_time_us = 2000u;
+    sch_run(&scheduler);
+    TEST_ASSERT_EQUAL_UINT32(2u, task_a_calls);
+    TEST_ASSERT_EQUAL_UINT32(2u, bg_calls);
 }
 
 /** @brief Verify a scheduler run executes a bounded periodic ready set once. */
