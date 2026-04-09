@@ -170,12 +170,14 @@ Maximum supported tasks:
 Defined with macro:
 
 ```c
-#define SCH_MAX_TASKS 64
+#define SCH_MAX_TASKS (64u)
 ```
 
 Tasks must be **statically allocated**.
 
 Dynamic memory is **not allowed**.
+
+This fixed static sizing is intentional for deterministic embedded predictability.
 
 ---
 
