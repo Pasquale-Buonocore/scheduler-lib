@@ -63,15 +63,15 @@ void test_ring_should_preserve_fifo_order_for_isr_push_and_task_pop(void) {
 
 void test_ring_drop_newest_should_reject_new_items_and_count_drops(void) {
     sch_spsc_ring_t ring;
-    uint8_t storage[2];
-    uint8_t out = 0u;
+    uint16_t storage[2];
+    uint16_t out = 0u;
 
     TEST_ASSERT_TRUE(sch_spsc_ring_init(
-        &ring, storage, 2u, sizeof(uint8_t), SCH_OVERFLOW_DROP_NEWEST));
+        &ring, storage, 2u, sizeof(uint16_t), SCH_OVERFLOW_DROP_NEWEST));
 
-    uint8_t a = 1u;
-    uint8_t b = 2u;
-    uint8_t c = 3u;
+    uint16_t a = 1u;
+    uint16_t b = 2u;
+    uint16_t c = 3u;
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_OK, sch_spsc_ring_push_isr(&ring, &a));
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_OK, sch_spsc_ring_push_isr(&ring, &b));
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_DROPPED_NEWEST, sch_spsc_ring_push_isr(&ring, &c));
@@ -81,22 +81,22 @@ void test_ring_drop_newest_should_reject_new_items_and_count_drops(void) {
     TEST_ASSERT_EQUAL_UINT32(2u, (uint32_t)sch_spsc_ring_size(&ring));
 
     TEST_ASSERT_TRUE(sch_spsc_ring_pop_task(&ring, &out));
-    TEST_ASSERT_EQUAL_UINT8(1u, out);
+    TEST_ASSERT_EQUAL_UINT16(1u, out);
     TEST_ASSERT_TRUE(sch_spsc_ring_pop_task(&ring, &out));
-    TEST_ASSERT_EQUAL_UINT8(2u, out);
+    TEST_ASSERT_EQUAL_UINT16(2u, out);
 }
 
 void test_ring_drop_oldest_should_keep_latest_items_and_count_drops(void) {
     sch_spsc_ring_t ring;
-    uint8_t storage[2];
-    uint8_t out = 0u;
+    uint16_t storage[2];
+    uint16_t out = 0u;
 
     TEST_ASSERT_TRUE(sch_spsc_ring_init(
-        &ring, storage, 2u, sizeof(uint8_t), SCH_OVERFLOW_DROP_OLDEST));
+        &ring, storage, 2u, sizeof(uint16_t), SCH_OVERFLOW_DROP_OLDEST));
 
-    uint8_t a = 10u;
-    uint8_t b = 20u;
-    uint8_t c = 30u;
+    uint16_t a = 10u;
+    uint16_t b = 20u;
+    uint16_t c = 30u;
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_OK, sch_spsc_ring_push_isr(&ring, &a));
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_OK, sch_spsc_ring_push_isr(&ring, &b));
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_DROPPED_OLDEST, sch_spsc_ring_push_isr(&ring, &c));
@@ -105,20 +105,20 @@ void test_ring_drop_oldest_should_keep_latest_items_and_count_drops(void) {
     TEST_ASSERT_EQUAL_UINT32(2u, (uint32_t)sch_spsc_ring_size(&ring));
 
     TEST_ASSERT_TRUE(sch_spsc_ring_pop_task(&ring, &out));
-    TEST_ASSERT_EQUAL_UINT8(20u, out);
+    TEST_ASSERT_EQUAL_UINT16(20u, out);
     TEST_ASSERT_TRUE(sch_spsc_ring_pop_task(&ring, &out));
-    TEST_ASSERT_EQUAL_UINT8(30u, out);
+    TEST_ASSERT_EQUAL_UINT16(30u, out);
     TEST_ASSERT_FALSE(sch_spsc_ring_pop_task(&ring, &out));
 }
 
 void test_ring_reset_should_clear_contents_and_drop_counter(void) {
     sch_spsc_ring_t ring;
-    uint8_t storage[3];
+    uint16_t storage[3];
 
     TEST_ASSERT_TRUE(sch_spsc_ring_init(
-        &ring, storage, 3u, sizeof(uint8_t), SCH_OVERFLOW_DROP_NEWEST));
+        &ring, storage, 3u, sizeof(uint16_t), SCH_OVERFLOW_DROP_NEWEST));
 
-    uint8_t value = 1u;
+    uint16_t value = 1u;
     (void)sch_spsc_ring_push_isr(&ring, &value);
     (void)sch_spsc_ring_push_isr(&ring, &value);
     (void)sch_spsc_ring_push_isr(&ring, &value);
@@ -133,18 +133,18 @@ void test_ring_reset_should_clear_contents_and_drop_counter(void) {
 
 void test_ring_should_report_empty_and_full_transitions_across_wraparound(void) {
     sch_spsc_ring_t ring;
-    uint8_t storage[3];
-    uint8_t out = 0u;
+    uint16_t storage[3];
+    uint16_t out = 0u;
 
     TEST_ASSERT_TRUE(sch_spsc_ring_init(
-        &ring, storage, 3u, sizeof(uint8_t), SCH_OVERFLOW_DROP_NEWEST));
+        &ring, storage, 3u, sizeof(uint16_t), SCH_OVERFLOW_DROP_NEWEST));
     TEST_ASSERT_TRUE(sch_spsc_ring_is_empty(&ring));
     TEST_ASSERT_FALSE(sch_spsc_ring_is_full(&ring));
 
-    uint8_t a = 1u;
-    uint8_t b = 2u;
-    uint8_t c = 3u;
-    uint8_t d = 4u;
+    uint16_t a = 1u;
+    uint16_t b = 2u;
+    uint16_t c = 3u;
+    uint16_t d = 4u;
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_OK, sch_spsc_ring_push_isr(&ring, &a));
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_OK, sch_spsc_ring_push_isr(&ring, &b));
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_OK, sch_spsc_ring_push_isr(&ring, &c));
@@ -153,16 +153,16 @@ void test_ring_should_report_empty_and_full_transitions_across_wraparound(void) 
     TEST_ASSERT_TRUE(sch_spsc_ring_is_full(&ring));
 
     TEST_ASSERT_TRUE(sch_spsc_ring_pop_task(&ring, &out));
-    TEST_ASSERT_EQUAL_UINT8(1u, out);
+    TEST_ASSERT_EQUAL_UINT16(1u, out);
     TEST_ASSERT_EQUAL(SCH_RING_PUSH_OK, sch_spsc_ring_push_isr(&ring, &d));
     TEST_ASSERT_TRUE(sch_spsc_ring_is_full(&ring));
 
     TEST_ASSERT_TRUE(sch_spsc_ring_pop_task(&ring, &out));
-    TEST_ASSERT_EQUAL_UINT8(2u, out);
+    TEST_ASSERT_EQUAL_UINT16(2u, out);
     TEST_ASSERT_TRUE(sch_spsc_ring_pop_task(&ring, &out));
-    TEST_ASSERT_EQUAL_UINT8(3u, out);
+    TEST_ASSERT_EQUAL_UINT16(3u, out);
     TEST_ASSERT_TRUE(sch_spsc_ring_pop_task(&ring, &out));
-    TEST_ASSERT_EQUAL_UINT8(4u, out);
+    TEST_ASSERT_EQUAL_UINT16(4u, out);
     TEST_ASSERT_TRUE(sch_spsc_ring_is_empty(&ring));
 }
 

@@ -36,7 +36,7 @@ typedef enum {
  *       interrupt-safe index updates.
  */
 typedef struct {
-    uint8_t *storage;              /**< Backing storage provided by caller. */
+    unsigned char *storage;         /**< Raw byte-addressed backing storage provided by caller. */
     size_t element_size;           /**< Size of one element in bytes. */
     size_t capacity;               /**< Number of elements in @ref storage. */
     size_t head;                   /**< Producer write index. */

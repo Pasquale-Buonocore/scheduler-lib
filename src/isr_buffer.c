@@ -31,7 +31,7 @@ bool sch_spsc_ring_init(
     }
 
     uint32_t state = sch_port_enter_critical();
-    ring->storage = (uint8_t *)storage;
+    ring->storage = (unsigned char *)storage;
     ring->element_size = element_size;
     ring->capacity = capacity;
     ring->head = 0u;
@@ -77,7 +77,7 @@ sch_ring_push_status_t sch_spsc_ring_push_isr(sch_spsc_ring_t *ring, const void 
         dropped_oldest = true;
     }
 
-    uint8_t *dst = &ring->storage[ring->head * ring->element_size];
+    unsigned char *dst = &ring->storage[ring->head * ring->element_size];
     (void)memcpy(dst, item, ring->element_size);
     ring->head = (ring->head + 1u) % ring->capacity;
     ring->count++;
@@ -99,7 +99,7 @@ bool sch_spsc_ring_pop_task(sch_spsc_ring_t *ring, void *out_item) {
         return false;
     }
 
-    uint8_t *src = &ring->storage[ring->tail * ring->element_size];
+    unsigned char *src = &ring->storage[ring->tail * ring->element_size];
     (void)memcpy(out_item, src, ring->element_size);
     ring->tail = (ring->tail + 1u) % ring->capacity;
     ring->count--;

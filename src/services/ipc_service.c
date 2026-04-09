@@ -3,8 +3,8 @@
 static void sch_ipc_isr_push(
     sch_ipc_service_t *service,
     sch_ipc_irq_tag_t tag,
-    uint8_t endpoint,
-    uint8_t slot,
+    uint16_t endpoint,
+    uint16_t slot,
     uint16_t detail_flags,
     uint32_t event_bit) {
     if (service == NULL) {
@@ -18,7 +18,7 @@ static void sch_ipc_isr_push(
     sch_ipc_irq_record_t record = {
         .endpoint = endpoint,
         .slot = slot,
-        .irq_tag = (uint8_t)tag,
+        .irq_tag = (uint16_t)tag,
         .detail_flags = detail_flags,
     };
 
@@ -50,17 +50,17 @@ bool sch_ipc_service_init(
 }
 
 void sch_ipc_isr_notify(
-    sch_ipc_service_t *service, uint8_t endpoint, uint8_t slot, uint16_t payload_flags) {
+    sch_ipc_service_t *service, uint16_t endpoint, uint16_t slot, uint16_t payload_flags) {
     sch_ipc_isr_push(
         service, SCH_IPC_IRQ_TAG_NOTIFY, endpoint, slot, payload_flags, SCH_IPC_EVENT_BIT_NOTIFY);
 }
 
-void sch_ipc_isr_ack(sch_ipc_service_t *service, uint8_t endpoint, uint8_t slot, uint16_t ack_flags) {
+void sch_ipc_isr_ack(sch_ipc_service_t *service, uint16_t endpoint, uint16_t slot, uint16_t ack_flags) {
     sch_ipc_isr_push(service, SCH_IPC_IRQ_TAG_ACK, endpoint, slot, ack_flags, SCH_IPC_EVENT_BIT_ACK);
 }
 
 void sch_ipc_isr_fault(
-    sch_ipc_service_t *service, uint8_t endpoint, uint16_t fault_flags, uint8_t source_slot) {
+    sch_ipc_service_t *service, uint16_t endpoint, uint16_t fault_flags, uint16_t source_slot) {
     sch_ipc_isr_push(
         service,
         SCH_IPC_IRQ_TAG_FAULT,

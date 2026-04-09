@@ -3,9 +3,9 @@
 bool sch_uart_service_init(
     sch_uart_service_t *service,
     const sch_uart_hal_t *hal,
-    uint8_t *rx_storage,
+    uint16_t *rx_storage,
     size_t rx_capacity,
-    uint8_t *tx_storage,
+    uint16_t *tx_storage,
     size_t tx_capacity,
     size_t max_rx_items_per_run,
     size_t max_tx_items_per_run) {
@@ -22,9 +22,9 @@ bool sch_uart_service_init(
     service->max_tx_items_per_run = max_tx_items_per_run;
 
     bool ok_rx = sch_spsc_ring_init(
-        &service->rx_ring, rx_storage, rx_capacity, sizeof(uint8_t), SCH_OVERFLOW_DROP_OLDEST);
+        &service->rx_ring, rx_storage, rx_capacity, sizeof(uint16_t), SCH_OVERFLOW_DROP_OLDEST);
     bool ok_tx = sch_spsc_ring_init(
-        &service->tx_ring, tx_storage, tx_capacity, sizeof(uint8_t), SCH_OVERFLOW_DROP_NEWEST);
+        &service->tx_ring, tx_storage, tx_capacity, sizeof(uint16_t), SCH_OVERFLOW_DROP_NEWEST);
 
     return (ok_rx && ok_tx);
 }
@@ -38,7 +38,7 @@ void sch_uart_isr_rx(sch_uart_service_t *service) {
         service->hal.ack_irq(service->hal.hal_ctx);
     }
 
-    uint8_t byte = 0u;
+    uint16_t byte = 0u;
     if (service->hal.try_read_byte(service->hal.hal_ctx, &byte)) {
         (void)sch_spsc_ring_push_isr(&service->rx_ring, &byte);
         service->rx_hint = true;
@@ -57,7 +57,7 @@ void sch_uart_isr_tx_ready(sch_uart_service_t *service) {
     service->tx_hint = true;
 }
 
-bool sch_uart_service_queue_tx(sch_uart_service_t *service, uint8_t byte) {
+bool sch_uart_service_queue_tx(sch_uart_service_t *service, uint16_t byte) {
     if (service == NULL) {
         return false;
     }
@@ -79,7 +79,7 @@ void sch_uart_service_run(void *ctx) {
     service->rx_hint = false;
     service->tx_hint = false;
 
-    uint8_t byte = 0u;
+    uint16_t byte = 0u;
     for (size_t i = 0u; i < service->max_tx_items_per_run; ++i) {
         if (!sch_spsc_ring_pop_task(&service->tx_ring, &byte)) {
             break;
