@@ -1,6 +1,14 @@
 
 # Cooperative Baremetal Scheduler — Codex Development Prompt
 
+> **Artifact classification:** design/backlog artifact (planning prompt).
+>
+> **Status labels:**
+> - **Implemented (current repo):** cooperative periodic/background scheduler core, static task model, bounded run loop, compatibility no-op `sch_enable_task()`, and optional stats/trace gates.
+> - **Planned (prompt-only):** any behavior in this file that conflicts with README current behavior.
+>
+> For current behavior and current skeleton limitations, use `README.md` as the source of truth.
+
 This document contains:
 1. **Complete technical specification** for a portable cooperative scheduler library.
 2. **An optimized prompt** designed for OpenAI Codex or similar code-generation systems to implement the library correctly.

@@ -1,5 +1,11 @@
 # Task 4 — Hybrid Polling-First Example Application
 
+> **Artifact classification:** design/backlog artifact (task prompt).
+>
+> **Status:** Implemented baseline in current repository unless explicitly marked as planned in the task body.
+>
+> For current behavior and skeleton limitations, `README.md` is authoritative.
+
 ## Purpose of this task file
 Use this file as a **prompt blueprint** for creating a runnable example that demonstrates the hybrid polling-first architecture end-to-end.
 

@@ -1,5 +1,11 @@
 # Task 6 — Polling-First Scheduler and Buffering Test Expansion
 
+> **Artifact classification:** design/backlog artifact (task prompt).
+>
+> **Status:** Implemented baseline in current repository unless explicitly marked as planned in the task body.
+>
+> For current behavior and skeleton limitations, `README.md` is authoritative.
+
 ## Purpose of this task file
 Use this file as a **test-focused AI prompt** to expand host-runnable coverage for polling-first scheduler behavior and ISR/task buffering.
 

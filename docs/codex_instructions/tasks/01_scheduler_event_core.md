@@ -1,5 +1,11 @@
 # Task 1 — Hybrid Polling-First Event Semantics in Scheduler Core
 
+> **Artifact classification:** design/backlog artifact (task prompt).
+>
+> **Status:** Implemented baseline in current repository unless explicitly marked as planned in the task body.
+>
+> For current behavior and skeleton limitations, `README.md` is authoritative.
+
 ## Purpose of this task file
 Use this file as a **self-contained AI prompt spec** for implementing hybrid polling-first semantics in the scheduler core. It defines scope, constraints, expected outputs, and acceptance criteria so an AI can execute the task with minimal ambiguity.
 

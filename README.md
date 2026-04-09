@@ -4,6 +4,11 @@ A small, portable **cooperative scheduler** for embedded systems.
 
 This library lets you register periodic and background tasks, then run them in a deterministic run-to-completion loop. It is designed for bare-metal projects that do not need preemption or a full RTOS.
 
+## Documentation authority and planning artifacts
+
+- This README is the **authoritative source** for the library's currently supported behavior and current skeleton-module limitations.
+- Files under `docs/codex_instructions/` are **design/backlog artifacts** used to guide implementation planning and AI tasking. They may include historical TODO items that are already complete or items intentionally not implemented in the current architecture.
+
 ## Why this library
 
 - Deterministic cooperative scheduling (no preemption).
