@@ -84,7 +84,7 @@ typedef struct {
     void *ctx;             /**< Opaque context pointer for @ref fn. */
     uint32_t period_ticks; /**< Execution period in ticks; 0 for background task. */
     uint32_t next_release; /**< Next release time in ticks for periodic tasks. */
-    uint8_t priority;      /**< Lower numeric value means higher priority. */
+    uint16_t priority;     /**< 16-bit priority where lower numeric value means higher priority. */
     bool enabled;          /**< Enables or disables the task without removing it. */
     bool pending;          /**< Internal ready flag for periodic tasks. */
     bool in_use;           /**< Indicates whether this slot is allocated. */
@@ -137,7 +137,7 @@ void sch_init(sch_t *scheduler);
  * @param ctx Opaque callback context pointer.
  * @param period_ticks Period in ticks (0 for background tasks).
  * @param start_delay_ticks Delay before first release for periodic tasks.
- * @param priority Lower numeric value means higher priority.
+ * @param priority 16-bit priority where lower numeric value means higher priority.
  *
  * @return Task identifier on success or negative error code on failure.
  */
@@ -147,7 +147,7 @@ int32_t sch_add_task(
     void *ctx,
     uint32_t period_ticks,
     uint32_t start_delay_ticks,
-    uint8_t priority);
+    uint16_t priority);
 
 /**
  * @brief Compatibility API: task enable/disable runtime control is unsupported.
