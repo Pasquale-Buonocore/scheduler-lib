@@ -98,9 +98,11 @@ If you need conditional execution, keep tasks registered and gate work inside th
 
 | Macro | Default | Meaning |
 |---|---:|---|
-| `SCH_MAX_TASKS` | project-defined | Max statically allocated scheduler task slots. |
+| `SCH_MAX_TASKS` | `64` (fixed) | Max statically allocated scheduler task slots. |
 | `SCH_ENABLE_STATS` | `0` | Enables per-task execution counters/timestamps. |
 | `SCH_ENABLE_TRACE` | `0` | Enables trace callbacks for task/scheduler events. |
+
+`SCH_MAX_TASKS` is intentionally fixed to a deterministic static size to preserve embedded-time predictability (bounded memory and iteration costs).
 
 With stats/trace disabled, instrumentation code paths are compiled out.
 
