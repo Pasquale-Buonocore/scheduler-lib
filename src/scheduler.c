@@ -11,7 +11,7 @@
 
 #include "scheduler/port/scheduler_port.h"
 
-#define SCH_LOWEST_PRIORITY (UINT16_MAX)
+#define SCH_LOWEST_PRIORITY (65535u)
 
 #if (SCH_ENABLE_TRACE == 1)
 /**
@@ -128,7 +128,7 @@ void sch_init(sch_t *scheduler) {
  * @param ctx Opaque task context pointer.
  * @param period_ticks Period in ticks (0 for background tasks).
  * @param start_delay_ticks Delay before first release.
- * @param priority Lower numeric value means higher priority.
+ * @param priority 16-bit priority where lower numeric value means higher priority.
  *
  * @return Task slot index on success or a negative error code.
  */
