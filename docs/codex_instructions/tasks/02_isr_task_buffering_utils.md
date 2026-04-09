@@ -1,5 +1,11 @@
 # Task 2 — ISR→Task Buffering Utilities
 
+> **Artifact classification:** design/backlog artifact (task prompt).
+>
+> **Status:** Implemented baseline in current repository unless explicitly marked as planned in the task body.
+>
+> For current behavior and skeleton limitations, `README.md` is authoritative.
+
 ## Purpose of this task file
 Use this file as a **direct AI prompt contract** for building reusable ISR-producer/task-consumer buffering utilities.
 

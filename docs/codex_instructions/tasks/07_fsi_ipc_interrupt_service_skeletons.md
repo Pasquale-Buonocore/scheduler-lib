@@ -1,5 +1,11 @@
 # Task 7 — FSI/IPC Interrupt Service Skeletons
 
+> **Artifact classification:** design/backlog artifact (task prompt).
+>
+> **Status:** Implemented baseline in current repository unless explicitly marked as planned in the task body.
+>
+> For current behavior and skeleton limitations, `README.md` is authoritative.
+
 ## Purpose of this task file
 Use this file as a **tasking prompt** for generating platform-agnostic FSI and IPC interrupt handling skeletons that follow the same ISR-to-task handoff model used in Task 3.
 

@@ -1,5 +1,11 @@
 # Task 3 — Driver/Service Skeleton Architecture
 
+> **Artifact classification:** design/backlog artifact (task prompt).
+>
+> **Status:** Implemented baseline in current repository unless explicitly marked as planned in the task body.
+>
+> For current behavior and skeleton limitations, `README.md` is authoritative.
+
 ## Purpose of this task file
 Use this file as a **tasking prompt** for generating platform-agnostic driver/service skeletons that demonstrate ISR-to-task handoff patterns.
 

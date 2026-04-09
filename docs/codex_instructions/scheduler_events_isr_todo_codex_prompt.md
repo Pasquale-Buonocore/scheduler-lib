@@ -1,5 +1,13 @@
 # Cooperative Scheduler — Missing Pieces: Events, ISR Bridge, Drivers, and System Integration (Codex Prompt)
 
+> **Artifact classification:** design/backlog artifact (planning prompt).
+>
+> **Status labels used in this document:**
+> - **Implemented:** present in repository today.
+> - **Planned:** intentionally future/backlog work or prompt-only design direction.
+>
+> `README.md` is authoritative for current behavior and skeleton limitations.
+
 This document is a **detailed implementation prompt** for Codex (or similar) to extend an existing **C99 cooperative bare-metal scheduler** (already implemented for periodic/background tasks) with the missing pieces needed for a real embedded system:
 
 - **Event mechanism**
@@ -321,53 +329,46 @@ scheduler/
 
 ---
 
-## 9. Detailed TODO List (What’s Missing)
+## 9. Status Snapshot (Implemented vs Planned)
 
-### Scheduler Core
-- [ ] Add scheduler-level `volatile sch_event_mask_t events;`
-- [ ] Add per-task `sch_event_mask_t subscribe_mask;`
-- [ ] Implement `sch_event_set_isr(sch_t*, mask)`
-- [ ] Implement event subscription API `sch_event_subscribe()`
-- [ ] In `sch_run()`, consume events and set `pending` for subscribed tasks
-- [ ] Ensure critical sections protect event mask and `pending` modifications
-- [ ] Document event semantics (bit-collapsing, use buffers for multiplicity)
+### Implemented (current repository)
 
-### Utilities
-- [ ] Implement SPSC ring buffer module (ISR producer, task consumer)
-- [ ] Add overflow counter and optional drop policy
-- [ ] (Optional) Implement generic index queue for DMA descriptors
+#### Scheduler core and semantics
+- [implemented] Hybrid polling-first behavior where periodic services are always scheduled.
+- [implemented] Critical-section guarded task state transitions and pending handling.
+- [implemented] Documented “events are advisory, payload in buffers” guidance in service modules/README.
 
-### UART
-- [ ] Define UART driver ISR pattern: drain FIFO → push to rb → `EVT_UART_RX`
-- [ ] Define UART service task: bounded drain → parse → enqueue TX
-- [ ] Decide TX strategy: TX-empty ISR drains TX rb OR periodic “TX kick”
+#### Utilities
+- [implemented] SPSC ring buffer module for ISR producer / task consumer.
+- [implemented] Overflow handling with drop accounting.
+- [implemented] Lightweight event/descriptor queue utility.
 
-### Ethernet
-- [ ] Define ETH driver ISR: ACK + set EVT_ETH_RX/EVT_ETH_TX; minimal descriptor work
-- [ ] Define ETH service task: bounded RX batch processing, descriptor recycling
-- [ ] Provide clear separation between HAL (registers) and service logic
+#### Service skeleton modules
+- [implemented] UART ISR→ring→service bounded processing pattern.
+- [implemented] Ethernet ISR hint + event queue + bounded service draining.
+- [implemented] I2C/EEPROM deferred request + completion queue handoff skeleton.
+- [implemented] Motor supervision service with ISR feedback/fault handoff.
+- [implemented] FSI and IPC interrupt/service skeletons using compact ISR records.
 
-### I2C / EEPROM
-- [ ] Non-blocking I2C driver interface (start transfer, check busy)
-- [ ] ISR completion sets EVT_I2C_DONE/EVT_I2C_ERR
-- [ ] EEPROM service implements transaction state machine (page writes, polling busy, retries)
-- [ ] Bounded work per activation (no long loops)
+#### Instrumentation
+- [implemented] Compile-time-gated per-task scheduler statistics.
+- [implemented] Compile-time-gated trace hooks (start/end/miss/overrun/idle).
 
-### Motor Control Integration
-- [ ] Define “fast ISR domain” placeholder (PWM/ADC ISR)
-- [ ] Provide supervisor task for state machine and safety checks
-- [ ] Define shared-data handoff pattern (double-buffering or critical-protected copies)
+#### Examples and tests
+- [implemented] `main_events_example.c` runnable finite demo.
+- [implemented] Host-runnable unit tests for scheduler, buffering, and service contracts.
 
-### Instrumentation (Optional but Recommended)
-- [ ] Add per-task timing stats (last/max exec time)
-- [ ] Add missed-deadline detection (release late)
-- [ ] Add trace callback hooks (start/end/miss)
-- [ ] Compile-time macros to enable/disable stats to avoid overhead
+### Planned (backlog / optional future enhancements)
 
-### Examples and Tests
-- [ ] Provide `main_events_example.c`
-- [ ] Provide host-side unit-test stubs (fake time + fake ISR event set) (optional)
-- [ ] Provide “GPIO toggle hook points” comments for hardware timing measurement
+#### Scheduler global event-mask APIs (not current architecture default)
+- [planned] Scheduler-level `volatile sch_event_mask_t events;`.
+- [planned] Per-task `sch_event_mask_t subscribe_mask;`.
+- [planned] `sch_event_set_isr(sch_t*, mask)` and `sch_event_subscribe()`.
+- [planned] In `sch_run()`, consume global event bits and set per-task pending flags.
+
+#### Service depth hardening
+- [planned] Expand EEPROM transaction state machine depth (e.g., production-grade retries/timeouts policy).
+- [planned] Add explicit GPIO timing hook comments/templates for hardware latency measurement.
 
 ---
 
