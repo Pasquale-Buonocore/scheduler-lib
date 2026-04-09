@@ -20,9 +20,9 @@ typedef enum {
 
 /** @brief Minimal ISR-captured metadata handed from ISR to service task. */
 typedef struct {
-    uint8_t channel;
-    uint8_t frame_index;
-    uint8_t irq_tag;
+    uint16_t channel;
+    uint16_t frame_index;
+    uint16_t irq_tag;
     uint16_t status;
 } sch_fsi_irq_record_t;
 
@@ -35,7 +35,7 @@ typedef enum {
 
 /** @brief HAL extension points owned by target-specific FSI driver. */
 typedef struct {
-    void (*ack_irq)(void *hal_ctx, sch_fsi_irq_tag_t tag, uint8_t channel);
+    void (*ack_irq)(void *hal_ctx, sch_fsi_irq_tag_t tag, uint16_t channel);
     bool (*service_rx_frame)(void *hal_ctx, const sch_fsi_irq_record_t *record);
     bool (*service_tx_complete)(void *hal_ctx, const sch_fsi_irq_record_t *record);
     bool (*service_error)(void *hal_ctx, const sch_fsi_irq_record_t *record);
@@ -59,12 +59,12 @@ bool sch_fsi_service_init(
     sch_overflow_mode_t overflow_mode);
 
 void sch_fsi_isr_rx(
-    sch_fsi_service_t *service, uint8_t channel, uint8_t frame_index, uint16_t status);
+    sch_fsi_service_t *service, uint16_t channel, uint16_t frame_index, uint16_t status);
 
 void sch_fsi_isr_tx(
-    sch_fsi_service_t *service, uint8_t channel, uint8_t frame_index, uint16_t status);
+    sch_fsi_service_t *service, uint16_t channel, uint16_t frame_index, uint16_t status);
 
-void sch_fsi_isr_error(sch_fsi_service_t *service, uint8_t channel, uint16_t error_status);
+void sch_fsi_isr_error(sch_fsi_service_t *service, uint16_t channel, uint16_t error_status);
 
 void sch_fsi_service_run(void *ctx);
 

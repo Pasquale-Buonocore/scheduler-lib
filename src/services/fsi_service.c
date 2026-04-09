@@ -3,8 +3,8 @@
 static void sch_fsi_isr_push(
     sch_fsi_service_t *service,
     sch_fsi_irq_tag_t tag,
-    uint8_t channel,
-    uint8_t frame_index,
+    uint16_t channel,
+    uint16_t frame_index,
     uint16_t status,
     uint32_t event_bit) {
     if (service == NULL) {
@@ -18,7 +18,7 @@ static void sch_fsi_isr_push(
     sch_fsi_irq_record_t record = {
         .channel = channel,
         .frame_index = frame_index,
-        .irq_tag = (uint8_t)tag,
+        .irq_tag = (uint16_t)tag,
         .status = status,
     };
     (void)sch_spsc_ring_push_isr(&service->irq_records, &record);
@@ -49,18 +49,18 @@ bool sch_fsi_service_init(
 }
 
 void sch_fsi_isr_rx(
-    sch_fsi_service_t *service, uint8_t channel, uint8_t frame_index, uint16_t status) {
+    sch_fsi_service_t *service, uint16_t channel, uint16_t frame_index, uint16_t status) {
     sch_fsi_isr_push(
         service, SCH_FSI_IRQ_TAG_RX, channel, frame_index, status, SCH_FSI_EVENT_BIT_RX);
 }
 
 void sch_fsi_isr_tx(
-    sch_fsi_service_t *service, uint8_t channel, uint8_t frame_index, uint16_t status) {
+    sch_fsi_service_t *service, uint16_t channel, uint16_t frame_index, uint16_t status) {
     sch_fsi_isr_push(
         service, SCH_FSI_IRQ_TAG_TX, channel, frame_index, status, SCH_FSI_EVENT_BIT_TX);
 }
 
-void sch_fsi_isr_error(sch_fsi_service_t *service, uint8_t channel, uint16_t error_status) {
+void sch_fsi_isr_error(sch_fsi_service_t *service, uint16_t channel, uint16_t error_status) {
     sch_fsi_isr_push(
         service,
         SCH_FSI_IRQ_TAG_ERROR,

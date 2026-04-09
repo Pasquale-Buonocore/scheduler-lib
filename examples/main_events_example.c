@@ -25,7 +25,7 @@ typedef enum {
 
 typedef struct {
     sch_spsc_ring_t uart_rx_ring;
-    uint8_t uart_rx_storage[UART_RING_CAPACITY];
+    uint16_t uart_rx_storage[UART_RING_CAPACITY];
 
     sch_event_queue_t eth_event_queue;
     uint16_t eth_event_storage[ETH_EVENT_CAPACITY];
@@ -42,8 +42,8 @@ typedef struct {
 
     uint32_t isr_uart_generated;
     uint32_t isr_eth_generated;
-    uint8_t next_uart_byte;
-    uint8_t next_eth_event;
+    uint16_t next_uart_byte;
+    uint16_t next_eth_event;
 
     uint32_t last_report_tick;
 } demo_app_t;
@@ -62,7 +62,7 @@ static void control_task(void *ctx) {
 }
 
 static void simulated_isr_push_uart(demo_app_t *app) {
-    uint8_t byte = app->next_uart_byte++;
+    uint16_t byte = app->next_uart_byte++;
     (void)sch_spsc_ring_push_isr(&app->uart_rx_ring, &byte);
     app->uart_irq_hint = true;
     app->isr_uart_generated++;
@@ -84,11 +84,11 @@ static void simulated_isr_task(void *ctx) {
     demo_app_t *app = (demo_app_t *)ctx;
 
     /* Burst arrivals intentionally exceed service budgets to demonstrate bounded work and drops. */
-    for (uint8_t i = 0u; i < 3u; ++i) {
+    for (uint16_t i = 0u; i < 3u; ++i) {
         simulated_isr_push_uart(app);
     }
 
-    for (uint8_t i = 0u; i < 2u; ++i) {
+    for (uint16_t i = 0u; i < 2u; ++i) {
         simulated_isr_push_eth_event(app);
     }
 }
@@ -104,7 +104,7 @@ static void uart_service_task(void *ctx) {
 
     app->uart_irq_hint = false;
 
-    uint8_t byte = 0u;
+    uint16_t byte = 0u;
     for (size_t i = 0u; i < max_items_per_run; ++i) {
         if (!sch_spsc_ring_pop_task(&app->uart_rx_ring, &byte)) {
             break;

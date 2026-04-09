@@ -11,7 +11,7 @@
 
 #include "scheduler/port/scheduler_port.h"
 
-#define SCH_LOWEST_PRIORITY (255u)
+#define SCH_LOWEST_PRIORITY (UINT16_MAX)
 
 #if (SCH_ENABLE_TRACE == 1)
 /**
@@ -138,7 +138,7 @@ int32_t sch_add_task(
     void *ctx,
     uint32_t period_ticks,
     uint32_t start_delay_ticks,
-    uint8_t priority) {
+    uint16_t priority) {
     if ((scheduler == NULL) || (fn == NULL)) {
         return SCH_ERR_INVALID_ARG;
     }
@@ -224,7 +224,7 @@ static void sch_mark_periodic_ready(sch_t *scheduler, uint32_t now) {
  */
 static int32_t sch_select_pending_task(const sch_t *scheduler) {
     int32_t selected = SCH_INVALID_TASK_ID;
-    uint8_t best_priority = SCH_LOWEST_PRIORITY;
+    uint16_t best_priority = SCH_LOWEST_PRIORITY;
 
     for (uint32_t i = 0u; i < SCH_MAX_TASKS; ++i) {
         const sch_task_t *task = &scheduler->tasks[i];

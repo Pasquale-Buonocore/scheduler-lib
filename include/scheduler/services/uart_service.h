@@ -12,8 +12,8 @@ extern "C" {
 #endif
 
 typedef struct {
-    bool (*try_read_byte)(void *hal_ctx, uint8_t *out_byte);
-    bool (*try_write_byte)(void *hal_ctx, uint8_t byte);
+    bool (*try_read_byte)(void *hal_ctx, uint16_t *out_byte);
+    bool (*try_write_byte)(void *hal_ctx, uint16_t byte);
     void (*ack_irq)(void *hal_ctx);
     void *hal_ctx;
 } sch_uart_hal_t;
@@ -31,9 +31,9 @@ typedef struct {
 bool sch_uart_service_init(
     sch_uart_service_t *service,
     const sch_uart_hal_t *hal,
-    uint8_t *rx_storage,
+    uint16_t *rx_storage,
     size_t rx_capacity,
-    uint8_t *tx_storage,
+    uint16_t *tx_storage,
     size_t tx_capacity,
     size_t max_rx_items_per_run,
     size_t max_tx_items_per_run);
@@ -42,7 +42,7 @@ void sch_uart_isr_rx(sch_uart_service_t *service);
 
 void sch_uart_isr_tx_ready(sch_uart_service_t *service);
 
-bool sch_uart_service_queue_tx(sch_uart_service_t *service, uint8_t byte);
+bool sch_uart_service_queue_tx(sch_uart_service_t *service, uint16_t byte);
 
 void sch_uart_service_run(void *ctx);
 
