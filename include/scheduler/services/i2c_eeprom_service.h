@@ -33,6 +33,7 @@ typedef struct {
     sch_i2c_eeprom_hal_t hal;
     sch_spsc_ring_t request_ring;
     sch_event_queue_t completion_queue;
+    /** ISR/task wake hint; set/read/clear must be inside sch_port critical sections. */
     volatile bool irq_hint;
     size_t max_requests_per_run;
     size_t max_completions_per_run;

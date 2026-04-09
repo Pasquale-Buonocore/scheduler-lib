@@ -1,4 +1,5 @@
 #include "scheduler/services/motor_supervision_service.h"
+#include "scheduler/port/scheduler_port.h"
 
 bool sch_motor_supervision_service_init(
     sch_motor_supervision_service_t *service,
@@ -62,7 +63,9 @@ void sch_motor_isr_feedback(sch_motor_supervision_service_t *service) {
     }
 
     (void)sch_event_queue_push_isr(&service->event_queue, (uint16_t)SCH_MOTOR_EVENT_FEEDBACK);
+    uint32_t state = sch_port_enter_critical();
     service->irq_hint = true;
+    sch_port_exit_critical(state);
 }
 
 void sch_motor_isr_fault(sch_motor_supervision_service_t *service) {
@@ -75,18 +78,27 @@ void sch_motor_isr_fault(sch_motor_supervision_service_t *service) {
     }
 
     (void)sch_event_queue_push_isr(&service->event_queue, (uint16_t)SCH_MOTOR_EVENT_FAULT);
+    uint32_t state = sch_port_enter_critical();
     service->irq_hint = true;
+    sch_port_exit_critical(state);
 }
 
 void sch_motor_supervision_service_run(void *ctx) {
     sch_motor_supervision_service_t *service = (sch_motor_supervision_service_t *)ctx;
-    if ((service == NULL) ||
-        (!service->irq_hint && sch_spsc_ring_is_empty(&service->feedback_ring) &&
-         (sch_event_queue_size(&service->event_queue) == 0u))) {
+    if (service == NULL) {
         return;
     }
 
+    bool had_irq_hint = false;
+    uint32_t state = sch_port_enter_critical();
+    had_irq_hint = service->irq_hint;
     service->irq_hint = false;
+    sch_port_exit_critical(state);
+
+    if (!had_irq_hint && sch_spsc_ring_is_empty(&service->feedback_ring) &&
+        (sch_event_queue_size(&service->event_queue) == 0u)) {
+        return;
+    }
 
     (void)service->hal.set_enable(service->hal.hal_ctx, service->enabled);
     if (service->enabled) {

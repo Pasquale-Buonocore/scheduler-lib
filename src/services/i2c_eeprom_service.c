@@ -1,4 +1,5 @@
 #include "scheduler/services/i2c_eeprom_service.h"
+#include "scheduler/port/scheduler_port.h"
 
 bool sch_i2c_eeprom_service_init(
     sch_i2c_eeprom_service_t *service,
@@ -59,18 +60,27 @@ void sch_i2c_eeprom_isr_complete(sch_i2c_eeprom_service_t *service) {
     }
 
     (void)sch_event_queue_push_isr(&service->completion_queue, (uint16_t)event_id);
+    uint32_t state = sch_port_enter_critical();
     service->irq_hint = true;
+    sch_port_exit_critical(state);
 }
 
 void sch_i2c_eeprom_service_run(void *ctx) {
     sch_i2c_eeprom_service_t *service = (sch_i2c_eeprom_service_t *)ctx;
-    if ((service == NULL) ||
-        (!service->irq_hint && sch_spsc_ring_is_empty(&service->request_ring) &&
-         (sch_event_queue_size(&service->completion_queue) == 0u))) {
+    if (service == NULL) {
         return;
     }
 
+    bool had_irq_hint = false;
+    uint32_t state = sch_port_enter_critical();
+    had_irq_hint = service->irq_hint;
     service->irq_hint = false;
+    sch_port_exit_critical(state);
+
+    if (!had_irq_hint && sch_spsc_ring_is_empty(&service->request_ring) &&
+        (sch_event_queue_size(&service->completion_queue) == 0u)) {
+        return;
+    }
 
     sch_eeprom_request_t request;
     for (size_t i = 0u; i < service->max_requests_per_run; ++i) {

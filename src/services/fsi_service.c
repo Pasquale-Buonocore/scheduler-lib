@@ -1,4 +1,5 @@
 #include "scheduler/services/fsi_service.h"
+#include "scheduler/port/scheduler_port.h"
 
 static void sch_fsi_isr_push(
     sch_fsi_service_t *service,
@@ -22,7 +23,9 @@ static void sch_fsi_isr_push(
         .status = status,
     };
     (void)sch_spsc_ring_push_isr(&service->irq_records, &record);
+    uint32_t state = sch_port_enter_critical();
     service->event_bits |= event_bit;
+    sch_port_exit_critical(state);
 }
 
 bool sch_fsi_service_init(
@@ -76,11 +79,15 @@ void sch_fsi_service_run(void *ctx) {
         return;
     }
 
-    if ((service->event_bits == 0u) && sch_spsc_ring_is_empty(&service->irq_records)) {
+    uint32_t pending_event_bits = 0u;
+    uint32_t state = sch_port_enter_critical();
+    pending_event_bits = service->event_bits;
+    service->event_bits = 0u;
+    sch_port_exit_critical(state);
+
+    if ((pending_event_bits == 0u) && sch_spsc_ring_is_empty(&service->irq_records)) {
         return;
     }
-
-    service->event_bits = 0u;
 
     sch_fsi_irq_record_t record = {0};
     for (size_t i = 0u; i < service->max_records_per_run; ++i) {
