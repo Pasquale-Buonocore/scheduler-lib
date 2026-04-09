@@ -37,6 +37,30 @@ Typical mapping:
 
 > **Important:** `sch_port_now_ticks()` should be based on a real time source in production firmware.
 
+
+### Porting
+
+See [`docs/porting_contract.md`](docs/porting_contract.md) for the full contract.
+
+Bring-up checklist (C28x / R5F / A53-style targets):
+
+- Provide a monotonic `sch_port_now_ticks()` source (wrap-safe `uint32_t`).
+- Implement `sch_port_enter_critical` / `sch_port_exit_critical` as a paired,
+  nested-safe state restore (never unconditional `enable_irq`).
+- Ensure ISR-safe critical calls for ISR producer APIs and block all IRQ
+  priorities that can touch scheduler-shared state.
+- Add required ordering/barriers so ISR/task handoff is visible on weaker
+  memory-order systems.
+- Keep `sch_port_idle()` wake-safe (`WFI`/wait path must still wake on expected
+  interrupts).
+
+Board validation quick checks:
+
+- Tick monotonicity under load.
+- Critical nesting behavior (enter twice, exit twice, interrupts only restore on
+  outermost exit).
+- Idle safety and expected wakeups.
+
 ### 3) Register tasks and run scheduler
 
 ```c
