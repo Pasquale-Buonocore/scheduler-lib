@@ -21,7 +21,7 @@ The specification targets **embedded bare‑metal systems** and prioritizes dete
 
 ## Purpose
 
-Design and implement a **portable cooperative scheduler library in C (C11)** intended for **baremetal embedded systems**.
+Design and implement a **portable cooperative scheduler library in C (C99)** intended for **baremetal embedded systems**.
 
 The scheduler must be:
 
@@ -425,7 +425,7 @@ Use the following prompt when asking Codex to implement the scheduler.
 
 ## Codex Prompt
 
-You are implementing a **portable cooperative scheduler library in C (C11)** for bare‑metal embedded systems.
+You are implementing a **portable cooperative scheduler library in C (C99)** for bare‑metal embedded systems.
 
 Your implementation must follow these constraints:
 
@@ -515,7 +515,7 @@ example main.c
 
 The code must:
 
-- compile with **C11**
+- compile with **C99**
 - avoid undefined behaviour
 - be readable
 - contain comments
