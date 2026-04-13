@@ -1,3 +1,8 @@
+/**
+ * @file ipc_service.h
+ * @brief IPC ISR record handoff service API.
+ */
+
 #ifndef SCHEDULER_SERVICES_IPC_SERVICE_H_
 #define SCHEDULER_SERVICES_IPC_SERVICE_H_
 
@@ -51,6 +56,22 @@ typedef struct {
     size_t max_records_per_run;
 } sch_ipc_service_t;
 
+/**
+ * @brief Initialize IPC service state and IRQ record ring.
+ *
+ * Copies HAL callbacks/context, resets advisory event bits, and initializes
+ * IRQ record buffering for deferred task-side dispatch.
+ *
+ * @param service Service instance to initialize.
+ * @param hal IPC HAL callback table and opaque HAL context.
+ * @param record_storage Caller-provided storage for IRQ records.
+ * @param record_capacity Number of IRQ records available in storage.
+ * @param max_records_per_run Upper bound on records drained per run.
+ * @param overflow_mode Overflow policy applied when IRQ record ring is full.
+ *
+ * @retval true Initialization succeeded.
+ * @retval false Invalid arguments or ring initialization failed.
+ */
 bool sch_ipc_service_init(
     sch_ipc_service_t *service,
     const sch_ipc_hal_t *hal,
@@ -59,20 +80,65 @@ bool sch_ipc_service_init(
     size_t max_records_per_run,
     sch_overflow_mode_t overflow_mode);
 
+/**
+ * @brief IPC notify ISR hook.
+ *
+ * Captures notify metadata and sets @ref SCH_IPC_EVENT_BIT_NOTIFY.
+ *
+ * @param service Service instance.
+ * @param endpoint Source/destination endpoint identifier.
+ * @param slot Mailbox or slot index associated with the IRQ.
+ * @param payload_flags HAL-defined payload detail flags.
+ */
 void sch_ipc_isr_notify(
     sch_ipc_service_t *service, uint16_t endpoint, uint16_t slot, uint16_t payload_flags);
 
+/**
+ * @brief IPC ack ISR hook.
+ *
+ * Captures ack metadata and sets @ref SCH_IPC_EVENT_BIT_ACK.
+ *
+ * @param service Service instance.
+ * @param endpoint Source/destination endpoint identifier.
+ * @param slot Mailbox or slot index associated with the IRQ.
+ * @param ack_flags HAL-defined acknowledgment detail flags.
+ */
 void sch_ipc_isr_ack(sch_ipc_service_t *service, uint16_t endpoint, uint16_t slot, uint16_t ack_flags);
 
+/**
+ * @brief IPC fault ISR hook.
+ *
+ * Captures fault metadata and sets @ref SCH_IPC_EVENT_BIT_FAULT.
+ *
+ * @param service Service instance.
+ * @param endpoint Endpoint associated with the fault.
+ * @param fault_flags HAL-defined fault detail flags.
+ * @param source_slot Slot or source identifier associated with the fault.
+ */
 void sch_ipc_isr_fault(
     sch_ipc_service_t *service, uint16_t endpoint, uint16_t fault_flags, uint16_t source_slot);
 
+/**
+ * @brief Execute one bounded IPC service cycle.
+ *
+ * Clears pending event bits, drains captured IRQ records, and dispatches each
+ * record to the HAL callback matching its IRQ tag.
+ *
+ * @param ctx Pointer to @ref sch_ipc_service_t.
+ */
 void sch_ipc_service_run(void *ctx);
 
+/**
+ * @brief Read count of dropped IRQ records.
+ *
+ * @param service Service instance.
+ *
+ * @return Total number of records dropped due to ring overflow.
+ */
 size_t sch_ipc_service_drop_count(const sch_ipc_service_t *service);
 
 #ifdef __cplusplus
 }
-#endif
+#endif /* SCHEDULER_SERVICES_IPC_SERVICE_H_ */
 
 #endif

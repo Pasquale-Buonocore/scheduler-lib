@@ -1,6 +1,11 @@
 #include "scheduler/services/ethernet_service.h"
 #include "scheduler/port/scheduler_port.h"
 
+/**
+ * @brief Initialize Ethernet service state and event queue.
+ *
+ * Mirrors @ref sch_eth_service_init contract from the public header.
+ */
 bool sch_eth_service_init(
     sch_eth_service_t *service,
     const sch_eth_hal_t *hal,
@@ -20,6 +25,12 @@ bool sch_eth_service_init(
         &service->event_queue, event_storage, event_capacity, SCH_OVERFLOW_DROP_OLDEST);
 }
 
+/**
+ * @brief Common ISR helper that acknowledges IRQ and enqueues event ID.
+ *
+ * @param service Service instance.
+ * @param event_id Event identifier to push into the queue.
+ */
 static void sch_eth_push_event_isr(sch_eth_service_t *service, sch_eth_event_id_t event_id) {
     if (service == NULL) {
         return;
@@ -32,18 +43,26 @@ static void sch_eth_push_event_isr(sch_eth_service_t *service, sch_eth_event_id_
     sch_port_exit_critical(state);
 }
 
+/** @brief RX ISR wrapper around @ref sch_eth_push_event_isr. */
 void sch_eth_isr_rx(sch_eth_service_t *service) {
     sch_eth_push_event_isr(service, SCH_ETH_EVENT_RX_READY);
 }
 
+/** @brief TX ISR wrapper around @ref sch_eth_push_event_isr. */
 void sch_eth_isr_tx(sch_eth_service_t *service) {
     sch_eth_push_event_isr(service, SCH_ETH_EVENT_TX_DONE);
 }
 
+/** @brief Link-state ISR wrapper around @ref sch_eth_push_event_isr. */
 void sch_eth_isr_link(sch_eth_service_t *service) {
     sch_eth_push_event_isr(service, SCH_ETH_EVENT_LINK_CHANGE);
 }
 
+/**
+ * @brief Execute one bounded Ethernet service cycle.
+ *
+ * @param ctx Pointer to @ref sch_eth_service_t.
+ */
 void sch_eth_service_run(void *ctx) {
     sch_eth_service_t *service = (sch_eth_service_t *)ctx;
     if (service == NULL) {
