@@ -131,6 +131,37 @@ If you need conditional execution, keep tasks registered and gate work inside th
 
 With stats/trace disabled, instrumentation code paths are compiled out.
 
+### Statistics and trace capabilities
+
+The scheduler library includes two optional instrumentation features:
+
+- **Statistics (`SCH_ENABLE_STATS`)**
+  - Per-task counters/timestamps for execution behavior.
+  - Useful for measuring task activity, runtime cadence, and troubleshooting timing behavior during development.
+- **Trace hooks (`SCH_ENABLE_TRACE`)**
+  - Callback hooks for key scheduler/task lifecycle events.
+  - Useful for event-level observability (for example, feeding debug logs, timeline traces, or external diagnostics).
+
+Because both features are compile-time gated, they are disabled by default and add no instrumentation overhead unless explicitly enabled.
+
+#### How to enable with CMake
+
+Enable either or both options at configure time:
+
+```bash
+cmake -S . -B build -DSCH_ENABLE_STATS=ON -DSCH_ENABLE_TRACE=ON
+cmake --build build
+```
+
+You can also enable only one feature:
+
+```bash
+cmake -S . -B build -DSCH_ENABLE_STATS=ON
+cmake -S . -B build -DSCH_ENABLE_TRACE=ON
+```
+
+If `build/` already exists, rerun the `cmake -S . -B build -D...` configure command to update cached options, then rebuild.
+
 ## Service skeleton modules (`include/scheduler/services/`)
 
 All service modules in this folder use the same core contract:
