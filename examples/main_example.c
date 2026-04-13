@@ -61,7 +61,7 @@ int main(void) {
     const uint64_t start_time_us = get_now_us();
 
     g_start_time.tv_sec = (time_t)(start_time_us / 1000000ull);
-    g_start_time.tv_usec = (suseconds_t)(start_time_us % 1000000ull);
+    g_start_time.tv_usec = (long)(start_time_us % 1000000ull);
 
     sch_init(&scheduler);
 

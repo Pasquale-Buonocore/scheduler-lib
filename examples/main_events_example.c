@@ -193,7 +193,7 @@ int main(void) {
     const uint64_t start_us = sch_mono_now_us();
 
     g_start_time.tv_sec = (time_t)(start_us / 1000000ull);
-    g_start_time.tv_usec = (suseconds_t)(start_us % 1000000ull);
+    g_start_time.tv_usec = (long)(start_us % 1000000ull);
 
     (void)sch_spsc_ring_init(
         &app.uart_rx_ring,
