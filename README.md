@@ -1,4 +1,4 @@
-# Cooperative bare-metal scheduler library (C11)
+# Cooperative bare-metal scheduler library (C99)
 
 A small, portable **cooperative scheduler** for embedded systems.
 

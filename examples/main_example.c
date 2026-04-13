@@ -14,7 +14,7 @@
 /** @brief Simulated monotonic tick source in microseconds. */
 static volatile uint32_t g_time_us = 0u;
 /** @brief Reference wall-clock timestamp used to derive relative scheduler ticks. */
-static struct timespec g_start_time = {0};
+static struct timeval g_start_time = {0};
 
 /**
  * @brief Read current wall-clock time in microseconds.
@@ -61,7 +61,7 @@ int main(void) {
     const uint64_t start_time_us = get_now_us();
 
     g_start_time.tv_sec = (time_t)(start_time_us / 1000000ull);
-    g_start_time.tv_nsec = (long)((start_time_us % 1000000ull) * 1000ull);
+    g_start_time.tv_usec = (suseconds_t)(start_time_us % 1000000ull);
 
     sch_init(&scheduler);
 
@@ -79,7 +79,7 @@ int main(void) {
 uint32_t sch_port_now_ticks(void) {
     const uint64_t now_us = get_now_us();
     const uint64_t start_us = ((uint64_t)g_start_time.tv_sec * 1000000ull) +
-                              ((uint64_t)g_start_time.tv_nsec / 1000ull);
+                              (uint64_t)g_start_time.tv_usec;
 
     if (now_us < start_us) {
         g_time_us = 0u;
