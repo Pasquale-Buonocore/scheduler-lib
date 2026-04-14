@@ -1,6 +1,11 @@
 #include "scheduler/services/i2c_eeprom_service.h"
 #include "scheduler/port/scheduler_port.h"
 
+/**
+ * @brief Initialize EEPROM service storage, budgets, and wake hint.
+ *
+ * Mirrors @ref sch_i2c_eeprom_service_init contract from the public header.
+ */
 bool sch_i2c_eeprom_service_init(
     sch_i2c_eeprom_service_t *service,
     const sch_i2c_eeprom_hal_t *hal,
@@ -35,6 +40,15 @@ bool sch_i2c_eeprom_service_init(
     return (ok_requests && ok_completions);
 }
 
+/**
+ * @brief Queue an EEPROM transfer request for deferred task-side submit.
+ *
+ * @param service Service instance.
+ * @param request Request descriptor to enqueue.
+ *
+ * @retval true Request enqueued.
+ * @retval false Invalid arguments or queue full.
+ */
 bool sch_i2c_eeprom_enqueue_request_isr(
     sch_i2c_eeprom_service_t *service,
     const sch_eeprom_request_t *request) {
@@ -45,6 +59,11 @@ bool sch_i2c_eeprom_enqueue_request_isr(
     return (sch_spsc_ring_push_isr(&service->request_ring, request) == SCH_RING_PUSH_OK);
 }
 
+/**
+ * @brief Handle completion interrupt and queue resulting completion event.
+ *
+ * @param service Service instance.
+ */
 void sch_i2c_eeprom_isr_complete(sch_i2c_eeprom_service_t *service) {
     if (service == NULL) {
         return;
@@ -65,6 +84,11 @@ void sch_i2c_eeprom_isr_complete(sch_i2c_eeprom_service_t *service) {
     sch_port_exit_critical(state);
 }
 
+/**
+ * @brief Execute one bounded EEPROM service cycle.
+ *
+ * @param ctx Pointer to @ref sch_i2c_eeprom_service_t.
+ */
 void sch_i2c_eeprom_service_run(void *ctx) {
     sch_i2c_eeprom_service_t *service = (sch_i2c_eeprom_service_t *)ctx;
     if (service == NULL) {

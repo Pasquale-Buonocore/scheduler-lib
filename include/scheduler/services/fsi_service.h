@@ -1,3 +1,8 @@
+/**
+ * @file fsi_service.h
+ * @brief FSI ISR record handoff service API.
+ */
+
 #ifndef SCHEDULER_SERVICES_FSI_SERVICE_H_
 #define SCHEDULER_SERVICES_FSI_SERVICE_H_
 
@@ -51,6 +56,22 @@ typedef struct {
     size_t max_records_per_run;
 } sch_fsi_service_t;
 
+/**
+ * @brief Initialize FSI service state and IRQ record ring.
+ *
+ * Copies HAL callbacks/context, resets advisory event bits, and initializes
+ * IRQ record buffering for deferred task-side dispatch.
+ *
+ * @param service Service instance to initialize.
+ * @param hal FSI HAL callback table and opaque HAL context.
+ * @param record_storage Caller-provided storage for IRQ records.
+ * @param record_capacity Number of IRQ records available in storage.
+ * @param max_records_per_run Upper bound on records drained per run.
+ * @param overflow_mode Overflow policy applied when IRQ record ring is full.
+ *
+ * @retval true Initialization succeeded.
+ * @retval false Invalid arguments or ring initialization failed.
+ */
 bool sch_fsi_service_init(
     sch_fsi_service_t *service,
     const sch_fsi_hal_t *hal,
@@ -59,20 +80,64 @@ bool sch_fsi_service_init(
     size_t max_records_per_run,
     sch_overflow_mode_t overflow_mode);
 
+/**
+ * @brief FSI RX ISR hook.
+ *
+ * Captures RX metadata and sets @ref SCH_FSI_EVENT_BIT_RX.
+ *
+ * @param service Service instance.
+ * @param channel FSI channel identifier.
+ * @param frame_index Frame index associated with RX completion.
+ * @param status HAL-defined RX status bits.
+ */
 void sch_fsi_isr_rx(
     sch_fsi_service_t *service, uint16_t channel, uint16_t frame_index, uint16_t status);
 
+/**
+ * @brief FSI TX ISR hook.
+ *
+ * Captures TX metadata and sets @ref SCH_FSI_EVENT_BIT_TX.
+ *
+ * @param service Service instance.
+ * @param channel FSI channel identifier.
+ * @param frame_index Frame index associated with TX completion.
+ * @param status HAL-defined TX status bits.
+ */
 void sch_fsi_isr_tx(
     sch_fsi_service_t *service, uint16_t channel, uint16_t frame_index, uint16_t status);
 
+/**
+ * @brief FSI error ISR hook.
+ *
+ * Captures error metadata and sets @ref SCH_FSI_EVENT_BIT_ERROR.
+ *
+ * @param service Service instance.
+ * @param channel FSI channel identifier.
+ * @param error_status HAL-defined error status bits.
+ */
 void sch_fsi_isr_error(sch_fsi_service_t *service, uint16_t channel, uint16_t error_status);
 
+/**
+ * @brief Execute one bounded FSI service cycle.
+ *
+ * Clears pending event bits, drains captured IRQ records, and dispatches each
+ * record to the HAL callback matching its IRQ tag.
+ *
+ * @param ctx Pointer to @ref sch_fsi_service_t.
+ */
 void sch_fsi_service_run(void *ctx);
 
+/**
+ * @brief Read count of dropped FSI IRQ records.
+ *
+ * @param service Service instance.
+ *
+ * @return Total number of records dropped due to ring overflow.
+ */
 size_t sch_fsi_service_drop_count(const sch_fsi_service_t *service);
 
 #ifdef __cplusplus
 }
-#endif
+#endif /* SCHEDULER_SERVICES_FSI_SERVICE_H_ */
 
 #endif

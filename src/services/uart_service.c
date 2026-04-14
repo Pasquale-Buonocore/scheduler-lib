@@ -1,6 +1,11 @@
 #include "scheduler/services/uart_service.h"
 #include "scheduler/port/scheduler_port.h"
 
+/**
+ * @brief Initialize UART service rings, budgets, and wake hints.
+ *
+ * Mirrors @ref sch_uart_service_init contract from the public header.
+ */
 bool sch_uart_service_init(
     sch_uart_service_t *service,
     const sch_uart_hal_t *hal,
@@ -30,6 +35,11 @@ bool sch_uart_service_init(
     return (ok_rx && ok_tx);
 }
 
+/**
+ * @brief Handle UART RX interrupt by capturing one byte into RX ring.
+ *
+ * @param service Service instance.
+ */
 void sch_uart_isr_rx(sch_uart_service_t *service) {
     if (service == NULL) {
         return;
@@ -48,6 +58,11 @@ void sch_uart_isr_rx(sch_uart_service_t *service) {
     }
 }
 
+/**
+ * @brief Handle UART TX-ready interrupt by setting TX work hint.
+ *
+ * @param service Service instance.
+ */
 void sch_uart_isr_tx_ready(sch_uart_service_t *service) {
     if (service == NULL) {
         return;
@@ -62,6 +77,15 @@ void sch_uart_isr_tx_ready(sch_uart_service_t *service) {
     sch_port_exit_critical(state);
 }
 
+/**
+ * @brief Enqueue one byte for deferred TX handling.
+ *
+ * @param service Service instance.
+ * @param byte Byte value to enqueue.
+ *
+ * @retval true Byte enqueued.
+ * @retval false Service was NULL or queue was full.
+ */
 bool sch_uart_service_queue_tx(sch_uart_service_t *service, uint16_t byte) {
     if (service == NULL) {
         return false;
@@ -70,6 +94,11 @@ bool sch_uart_service_queue_tx(sch_uart_service_t *service, uint16_t byte) {
     return (sch_spsc_ring_push_isr(&service->tx_ring, &byte) == SCH_RING_PUSH_OK);
 }
 
+/**
+ * @brief Execute one bounded UART service cycle.
+ *
+ * @param ctx Pointer to @ref sch_uart_service_t.
+ */
 void sch_uart_service_run(void *ctx) {
     sch_uart_service_t *service = (sch_uart_service_t *)ctx;
     if (service == NULL) {

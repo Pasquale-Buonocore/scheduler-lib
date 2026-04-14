@@ -1,6 +1,16 @@
 #include "scheduler/services/fsi_service.h"
 #include "scheduler/port/scheduler_port.h"
 
+/**
+ * @brief Common ISR helper to capture FSI metadata and set event bit.
+ *
+ * @param service Service instance.
+ * @param tag IRQ class tag.
+ * @param channel FSI channel identifier.
+ * @param frame_index Frame index metadata.
+ * @param status HAL-defined status bits.
+ * @param event_bit Advisory bit to OR into pending event set.
+ */
 static void sch_fsi_isr_push(
     sch_fsi_service_t *service,
     sch_fsi_irq_tag_t tag,
@@ -28,6 +38,11 @@ static void sch_fsi_isr_push(
     sch_port_exit_critical(state);
 }
 
+/**
+ * @brief Initialize FSI service ring, budgets, and event bits.
+ *
+ * Mirrors @ref sch_fsi_service_init contract from the public header.
+ */
 bool sch_fsi_service_init(
     sch_fsi_service_t *service,
     const sch_fsi_hal_t *hal,
@@ -51,18 +66,41 @@ bool sch_fsi_service_init(
         overflow_mode);
 }
 
+/**
+ * @brief Capture FSI RX IRQ record.
+ *
+ * @param service Service instance.
+ * @param channel Channel identifier.
+ * @param frame_index Frame index.
+ * @param status HAL-defined status bits.
+ */
 void sch_fsi_isr_rx(
     sch_fsi_service_t *service, uint16_t channel, uint16_t frame_index, uint16_t status) {
     sch_fsi_isr_push(
         service, SCH_FSI_IRQ_TAG_RX, channel, frame_index, status, SCH_FSI_EVENT_BIT_RX);
 }
 
+/**
+ * @brief Capture FSI TX IRQ record.
+ *
+ * @param service Service instance.
+ * @param channel Channel identifier.
+ * @param frame_index Frame index.
+ * @param status HAL-defined status bits.
+ */
 void sch_fsi_isr_tx(
     sch_fsi_service_t *service, uint16_t channel, uint16_t frame_index, uint16_t status) {
     sch_fsi_isr_push(
         service, SCH_FSI_IRQ_TAG_TX, channel, frame_index, status, SCH_FSI_EVENT_BIT_TX);
 }
 
+/**
+ * @brief Capture FSI error IRQ record.
+ *
+ * @param service Service instance.
+ * @param channel Channel identifier.
+ * @param error_status HAL-defined error status bits.
+ */
 void sch_fsi_isr_error(sch_fsi_service_t *service, uint16_t channel, uint16_t error_status) {
     sch_fsi_isr_push(
         service,
@@ -73,6 +111,11 @@ void sch_fsi_isr_error(sch_fsi_service_t *service, uint16_t channel, uint16_t er
         SCH_FSI_EVENT_BIT_ERROR);
 }
 
+/**
+ * @brief Execute one bounded FSI service cycle.
+ *
+ * @param ctx Pointer to @ref sch_fsi_service_t.
+ */
 void sch_fsi_service_run(void *ctx) {
     sch_fsi_service_t *service = (sch_fsi_service_t *)ctx;
     if (service == NULL) {
@@ -117,6 +160,13 @@ void sch_fsi_service_run(void *ctx) {
     }
 }
 
+/**
+ * @brief Return accumulated drop count for FSI IRQ record ring.
+ *
+ * @param service Service instance.
+ *
+ * @return Drop counter value.
+ */
 size_t sch_fsi_service_drop_count(const sch_fsi_service_t *service) {
     if (service == NULL) {
         return 0u;
